@@ -153,6 +153,7 @@ reviewPaper rp = do
                     let tid = getCardanoTxId ledgerTx
                     void $ awaitTxConfirmed tid
                     logInfo @String $ "[reviewer] claimed rewards"
+                    logInfo @String $ "[reviewer] Final Datum: " ++ show (datum)
                 _ -> do
                     logInfo @String "[reviewer] paper review request is still open. Now checking the deadline..."
                     --deadline <- runExceptT $ checkDeadline (d_nextDeadline datum)
@@ -177,6 +178,7 @@ reviewPaper rp = do
                                     ledgerTx <- submitTxConstraintsWith @Reviewing lookups tx
                                     void $ awaitTxConfirmed $ getCardanoTxId ledgerTx
                                     logInfo @String "[reviewer] reclaimed all stakes"
+                                    
 
                         Right _ -> do
                             
@@ -190,9 +192,9 @@ reviewPaper rp = do
                                 Right _ -> do
 
                                     logInfo @String "[reviewer] Now building the tx with a new paper decision..."                      
-                                    let x = case roundValue of
+                                    {-let x = case roundValue of
                                                 (Round r) | r > 0 -> (lovelaceValueOf $ (stake paper)*2 ) 
-                                                _ -> lovelaceValueOf (stake paper)
+                                                _ -> lovelaceValueOf (stake paper) -}
                                     let tokens = assetClassValue (paperNFT paper) 2
                                     --let v = x <> tokens
                                     let v       = let y = lovelaceValueOf (stake paper) in y <> y <> tokens
@@ -210,6 +212,7 @@ reviewPaper rp = do
                                     let tid = getCardanoTxId ledgerTx
                                     void $ awaitTxConfirmed tid
                                     logInfo @String $ "[reviewer] reviewer's decision: " ++ show (rev)
+                                    logInfo @String $ "[reviewer] New Datum: " ++ show (out_datum)
                            
         _ -> logInfo @String "[reviewer] no review request found"
 
@@ -280,8 +283,8 @@ updatePaper up = do
 
                             Just decision | (decision == Accept || decision == Reject) -> do
                                 logInfo @String "[author] Now building the tx with CLOSED datum..."
-                                let token     = assetClassValue (paperNFT paper) 1
-                                let v         = let x = lovelaceValueOf ((stake paper) + (reward paper)) in x <> x <> token -- Value to the script should be e.g. 25+12.5, that'll go to reviewer
+                                let tokens     = assetClassValue (paperNFT paper) 2
+                                let v         = let x = lovelaceValueOf $ ((reward paper)) in x <> x <> tokens -- Value to the script should be e.g. 25+12.5, that'll go to reviewer
                                     --time      = now + (timeInterval paper) -NO NEED TO SET A NEW DEADLINE!
                                     up_status = let lastround = (\(Reviewed (Round r)) -> r) (d_status datum) in Closed (Round lastround) -- THIS KEEPS THE LAST ROUND!                                    
                                     ipns      = upManuscript up
@@ -295,13 +298,14 @@ updatePaper up = do
                                 ledgerTx <- submitTxConstraintsWith @Reviewing lookups tx
                                 let tid = getCardanoTxId ledgerTx
                                 void $ awaitTxConfirmed tid
-                                logInfo @String $ "[author] Paper Closed!"
+                                logInfo @String $ "[author] Paper Closed! " ++ show (v)
+                                logInfo @String $ "[author] Final Datum: " ++ show (out_datum)
 
 
                             Just decision | (decision == Minor || decision == Major) -> do
                                 logInfo @String "[author] Now building the tx with UPDATED datum..."
                                 let tokens     = assetClassValue (paperNFT paper) 2
-                                let v         = let x = lovelaceValueOf $ (2*stake paper) in x <> x <> tokens
+                                let v         = let x = lovelaceValueOf $ (1*stake paper) in x <> x <> tokens
                                     time          = (d_nextDeadline datum) + (timeInterval paper) -- the last deadline gets extended by the hardcoded amount
                                     up_status     = updateStatus $ d_status datum -- this changes from (Reviewed Round x) to (Submitted Round x)
                                     ipns          = upManuscript up
@@ -310,12 +314,13 @@ updatePaper up = do
                                                 Constraints.otherScript (paperValidator paper) <>
                                                 Constraints.typedValidatorLookups (typedPaperValidator paper)
                                     tx        = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ UpdatedAt ipns) <> 
-                                                Constraints.mustPayToTheScript (out_datum) v <> 
+                                                Constraints.mustPayToTheScript (out_datum) v <>
                                                 Constraints.mustValidateIn (to $ (d_nextDeadline datum)-1 )                                                    
                                 ledgerTx <- submitTxConstraintsWith @Reviewing lookups tx
                                 let tid = getCardanoTxId ledgerTx
                                 void $ awaitTxConfirmed tid
                                 logInfo @String $ "[author] Paper Updated!"
+                                logInfo @String $ "[author] New Datum: " ++ show (out_datum)
                             _ -> do
                                 logInfo @String "[author] Nothing???"    
 

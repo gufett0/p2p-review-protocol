@@ -82,7 +82,7 @@ myTrace pd1 pd2 = do
     let mypaper = Paper { 
       author           = mockWalletPaymentPubKeyHash w1
     , stake            = 100_000_000
-    , reward           = 50_000_000
+    , reward           = 75_000_000
     , timeInterval     = POSIXTime {getPOSIXTime = 10_000}
     , paperNFT         = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
     } 
@@ -127,22 +127,19 @@ myTrace pd1 pd2 = do
 
         
     callEndpoint @"createPaper" h1 cp
-
     void $ Emulator.waitNSlots 5
 
     callEndpoint @"reviewPaper" h2 rp1
-
     void $ Emulator.waitNSlots 5
 
     callEndpoint @"updatePaper" h1 up1
-
     void $ Emulator.waitNSlots 5
 
-    callEndpoint @"reviewPaper" h2 rp2
-
+    callEndpoint @"reviewPaper" h2 rp2 
     void $ Emulator.waitNSlots 5
 
     callEndpoint @"updatePaper" h1 up1
+    void $ Emulator.waitNSlots 5 
 
 ------------
 

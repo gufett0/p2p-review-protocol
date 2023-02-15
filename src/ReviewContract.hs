@@ -51,7 +51,7 @@ mkPaperValidator paper dat red ctx =
     case (dat, red) of 
 
         --reviewer finds an unreviewed paper.
-        --paper review is ONGOING (reviewer votes either Minor or Major).
+        --paper review is ONGOING (reviewer votes).
         (PaperDatum
                { d_currentManuscript  = Manuscript ipns
                , d_reviewerPkh        = rev_pkh
@@ -60,7 +60,7 @@ mkPaperValidator paper dat red ctx =
                , d_status             = Submitted (Round r)
                }, Revision paperdecision) ->
             traceIfFalse "Error: Input   (Reviewer) - Not signed"             (txSignedBy info (unPaymentPubKeyHash rev_pkh)) && 
-            traceIfFalse "Error: Input   (Script)   - Invalid Value"          (lovelaces (txOutValue ownInput) >= stake paper)         &&
+            traceIfFalse "Error: Input   (Script)   - Invalid Value"          (lovelaces (txOutValue ownInput) == if r == 0 then stake paper else 2*stake paper) && 
             traceIfFalse "Error: Output  (Script)   - Invalid Value"          (lovelaces (txOutValue ownOutput) == (2*stake paper))  &&
             traceIfFalse "Error: Input   (Time)     - Too late"               (to (time) `contains` txInfoValidRange info)  &&
             traceIfFalse "Error: Output  (Script)   - Missing Tokens"         (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 2) &&
@@ -86,11 +86,12 @@ mkPaperValidator paper dat red ctx =
             traceIfFalse "Error: Input   (Time)     - Too late"               (to (time) `contains` txInfoValidRange info)  &&
             traceIfFalse "Error: Input   (Redeemer) - Wrong paper referenced" (ms == (d_currentManuscript dat)) &&                   
             traceIfFalse "Error: Output  (Script)   - Missing Tokens"         (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 2) &&
-            traceIfFalse "Error: Output  (Datum)    - Wrong output datum"     (outputDatum == PaperDatum
+            traceIfFalse "Error: Input   (Datum)    - A final decision"       (notfinal == (Just Minor) || notfinal == (Just Major)) &&
+            traceIfFalse "Error: Output  (Datum)-update    - Wrong output datum"     (outputDatum == PaperDatum
                                                                                 { d_currentManuscript  = Manuscript ipns
                                                                                 , d_reviewerPkh        = rev_pkh
-                                                                                , d_currentDecision    = notfinal
-                                                                                , d_nextDeadline       = (time) + (timeInterval paper)
+                                                                                , d_currentDecision    = Nothing
+                                                                                , d_nextDeadline       = time + (timeInterval paper)
                                                                                 , d_status             = Submitted (Round r)
                                                                                 })              
         --author sees Accept or Reject
@@ -104,7 +105,7 @@ mkPaperValidator paper dat red ctx =
                }, ClosedAt ms) ->
             traceIfFalse "Error: Input   (Author)   - Not signed"             (txSignedBy info (unPaymentPubKeyHash $ author paper)) && 
             traceIfFalse "Error: Input   (Script)   - Invalid value"          (lovelaces (txOutValue ownInput) == (2*stake paper))  &&
-            traceIfFalse "Error: Output  (Script)   - Invalid value"          (lovelaces (txOutValue ownOutput) == ((stake paper) + (reward paper)))  &&
+           -- traceIfFalse "Error: Output  (Script)   - Invalid value"          (lovelaces (txOutValue ownOutput) == ((stake paper) + (reward paper)))  &&
             traceIfFalse "Error: Input   (Time)     - Too late"               (to (lastdeadline) `contains` txInfoValidRange info) &&           
             traceIfFalse "Error: Input   (Redeemer) - Wrong paper referenced" (ms == (d_currentManuscript dat)) &&                   
             traceIfFalse "Error: Output  (Script)   - Missing tokens"         (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 2) &&            
@@ -176,6 +177,8 @@ mkPaperValidator paper dat red ctx =
         ownOutput = case getContinuingOutputs ctx of
             [o] -> o
             _   -> traceError "expected exactly one paper output" 
+
+        cardano_fee = Ada.getLovelace . Ada.fromValue $ txInfoFee info    
 
         outputDatum :: PaperDatum
         outputDatum = case paperDatum $ txOutDatumHash ownOutput >>= flip findDatum info of
