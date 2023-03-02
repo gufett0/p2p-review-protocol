@@ -26,19 +26,13 @@ import           PlutusTx.Prelude       hiding (Semigroup(..), String, unless)
 import           Prelude                (show, Double, String)
 import           Ledger                 hiding (singleton)
 import qualified Plutus.V1.Ledger.Ada   as Ada
---import qualified Plutus.V1.Ledger.Value as Value
 import           Text.Printf            (printf)
 import           Wallet.Emulator.Wallet
 import           Data.Monoid            (Last (..))
 import           Plutus.Trace.Emulator  as Emulator
 
 
---import qualified System.IO as IO
 
-
-
-
--- ONCHAIN -----------------------------
 
 {-# INLINABLE lovelaces #-}
 lovelaces :: Value -> Integer
@@ -50,8 +44,10 @@ paperDatum md = do
     Datum d <- md
     PlutusTx.fromBuiltinData d
 
--- OFFCHAIN -----------------------------
-
+getPaperDatum :: ChainIndexTxOut -> Maybe PaperDatum
+getPaperDatum o = case _ciTxOutDatum o of
+  Left _ -> Nothing
+  Right d -> paperDatum $ Just d
 
 checkStatus :: PaperStatus -> PaperStatus -> Contract w s Text (Either String ())
 checkStatus status arg =
@@ -62,7 +58,7 @@ checkStatus status arg =
 checkDeadline :: POSIXTime -> Contract w s Text (Either String ())
 checkDeadline deadline = do
     now <- currentTime
-    if now > deadline 
+    if now >= deadline 
         then return (Left "Deadline Passed!") 
         else return (Right ())        
 

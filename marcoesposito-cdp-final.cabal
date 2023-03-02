@@ -15,6 +15,7 @@ library
                      , Utils
                      , TxConstruction
                      , Tests
+                     , TestsParallel                   
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , containers
@@ -32,7 +33,7 @@ library
                      , text
                      , lens
                      , freer-simple
-  --                   , plutus-chain-index-core
+                     , mtl
                      , transformers >=0.5.6.2
   default-language:    Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise

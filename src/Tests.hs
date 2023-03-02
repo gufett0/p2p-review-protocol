@@ -7,35 +7,29 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TupleSections         #-} --added by me
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TupleSections         #-} 
  
-module Tests ( test, test', PaperDatum (..), PaperDecision (..), paperDatum ) where
+module Tests where
 
 import           Types
 import           Utils
 import           TxConstruction
 import           ReviewContract         
 import           Control.Monad              hiding (fmap)
-import           Control.Lens --added by me
---import           Ledger.Tx (CardanoTx(..), lookupDatum)--added by me for lookupDatum 
---import           Plutus.Contract      as Contract --added by me
-import           Data.Maybe --added by me for lookupDatum
---import           Wallet.Emulator.Chain --added by me
---import           Control.Monad.Freer (Eff, Member, interpret, runM) --added by me
---import           Plutus.ChainIndex.Effects() --added by me
---import           Plutus.ChainIndex.Tx() --added by me
---import           Ledger.Tx.CardanoAPI (SomeCardanoApiTx (SomeTx))--added by me
-
+import           Control.Lens 
+import           Data.Maybe 
 import           Control.Monad.Freer.Extras as Extras
 import           Data.Default               (Default (..))
 import qualified Data.Map                   as Map
+import           Data.Text                  (Text)
 import           Ledger
 import           Ledger.TimeSlot()
 import           Ledger.Value 
 import           Ledger.Ada                 as Ada
 import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
-import           Prelude                    (IO, Show (..))
+import           Prelude                    (IO, Show (..), String, div, last)
 import           Wallet.Emulator.Wallet
 
 
@@ -44,26 +38,30 @@ paperReviewTokenCurrency :: CurrencySymbol
 paperReviewTokenCurrency = "2023"
 
 paperReviewToken :: TokenName
-paperReviewToken = "PaperToken"
+paperReviewToken = "PaperReviewToken"
 
-w1, w2 :: Wallet
+w1, w2, w3, w4 :: Wallet
 w1 = knownWallet 1
 w2 = knownWallet 2
+w3 = knownWallet 3
+w4 = knownWallet 4
 
-test :: IO ()
-test = do
-    test' Minor Accept
-    test' Major Accept
-    test' Major Reject
 
-test' :: PaperDecision -> PaperDecision -> IO ()
-test' pd1 pd2 = runEmulatorTraceIO' def emCfg $ myTrace pd1 pd2
+testSet :: IO ()
+testSet = do
+    test [[Minor, Accept], [Major, Reject], [Major, Minor, Accept]]
+    --test [[Minor, Reject], [Minor, Reject], [Major, Minor, Accept]]
 
+
+test :: [[PaperDecision]] -> IO ()
+test pdlist = runEmulatorTraceIO' def emCfg $ myTrace pdlist
   where
     emCfg :: EmulatorConfig
     emCfg = def { _initialChainState = Left $ Map.fromList
-                    [ (w1, v <> assetClassValue (AssetClass (paperReviewTokenCurrency, paperReviewToken)) 2)
+                    [ (w1, v <> assetClassValue (AssetClass (paperReviewTokenCurrency, paperReviewToken)) 6)
                     , (w2, v)
+                    , (w3, v)
+                    , (w4, v)
                     ]
                 }
 
@@ -72,84 +70,88 @@ test' pd1 pd2 = runEmulatorTraceIO' def emCfg $ myTrace pd1 pd2
 
 ---------------------------
 
-myTrace :: PaperDecision -> PaperDecision -> EmulatorTrace ()
-myTrace pd1 pd2 = do
-    Extras.logInfo $ "Simulating just a " ++ show pd1 ++ "revision with a final " ++ show pd2 ++ "decision"
+myTrace :: [[PaperDecision]] -> EmulatorTrace ()
+myTrace pdlist = do
+    Extras.logInfo $ "Simulating revisions with decisions: " ++ show pdlist
 
-    h1 <- activateContractWallet w1 endpoints
-    h2 <- activateContractWallet w2 endpoints
+    h0 <- activateContractWallet w1 endpoints
+    h1 <- activateContractWallet w2 endpoints
+    h2 <- activateContractWallet w3 endpoints
+    h3 <- activateContractWallet w4 endpoints
 
     let mypaper = Paper { 
       author           = mockWalletPaymentPubKeyHash w1
     , stake            = 100_000_000
-    , reward           = 75_000_000
+    , reward           = stake mypaper `div` 2
     , timeInterval     = POSIXTime {getPOSIXTime = 10_000}
     , paperNFT         = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
     } 
 
-    let pkh_rev   = mockWalletPaymentPubKeyHash w2
+    let pkh_reviewer1   = mockWalletPaymentPubKeyHash w2
+        pkh_reviewer2   = mockWalletPaymentPubKeyHash w3
+        pkh_reviewer3   = mockWalletPaymentPubKeyHash w4
         fileIpns  = Manuscript "ipns_address"
-        scriptAdd = paperAddress mypaper 
-        --deadline2 = slotToBeginPOSIXTime def 10
-        
+        scriptAdd = paperAddress mypaper      
+        ap0 = AuthorParams 
+                        { upReviewer        = pkh_reviewer1
+                        , upStake           = stake mypaper
+                        , upReward          = reward mypaper
+                        , upTimeToDeadline  = timeInterval mypaper
+                        , upCurrency        = paperReviewTokenCurrency
+                        , upTokenName       = paperReviewToken
+                        , upManuscript      = fileIpns
+                        }
+        ap2 = ap0{upReviewer = pkh_reviewer2}
+        ap3 = ap0{upReviewer = pkh_reviewer3}
+        rp = ReviewerParams
+                        { rpAuthor         = author mypaper
+                        , rpStake          = stake mypaper
+                        , rpReward         = reward mypaper
+                        , rpTimeToDeadline = timeInterval mypaper
+                        , rpCurrency       = paperReviewTokenCurrency
+                        , rpTokenName      = paperReviewToken
+                        }
 
-        cp = CreateParams 
-                { cpReviewer        = pkh_rev
-                , cpStake           = stake mypaper
-                , cpReward          = reward mypaper
-                , cpTimeToDeadline  = timeInterval mypaper
-                , cpCurrency        = paperReviewTokenCurrency
-                , cpTokenName       = paperReviewToken
-                , cpManuscript      = fileIpns
-                }
-  
-        rp1 = ReviewParams
-                { rpAuthor         = author mypaper
-                , rpStake          = stake mypaper
-                , rpReward         = reward mypaper
-                , rpTimeToDeadline = timeInterval mypaper
-                , rpCurrency       = paperReviewTokenCurrency
-                , rpTokenName      = paperReviewToken
-                , rpDecision       = pd1
-                }
-
-        rp2 = rp1{rpDecision       = pd2}
-
-        up1 = UpdateParams
-                { upReviewer        = pkh_rev
-                , upStake           = stake mypaper
-                , upReward          = reward mypaper
-                , upTimeToDeadline  = timeInterval mypaper
-                , upCurrency        = paperReviewTokenCurrency
-                , upTokenName       = paperReviewToken
-                , upManuscript      = fileIpns
-                }
-
-        
-    callEndpoint @"createPaper" h1 cp
-    void $ Emulator.waitNSlots 5
-
-    callEndpoint @"reviewPaper" h2 rp1
-    void $ Emulator.waitNSlots 5
-
-    callEndpoint @"updatePaper" h1 up1
-    void $ Emulator.waitNSlots 5
-
-    callEndpoint @"reviewPaper" h2 rp2 
-    void $ Emulator.waitNSlots 5
-
-    callEndpoint @"updatePaper" h1 up1
-    void $ Emulator.waitNSlots 5 
-
-------------
-
-    finalUtxos <- getUtxos scriptAdd
-    Extras.logInfo $ "Final Script UTXOS: " ++ show finalUtxos
-
-    finalUtxosPB <- getUtxos (mockWalletAddress w1)
-    Extras.logInfo $ "Final Author UTXOS: " ++ show finalUtxosPB
+    -- first review
+    reviewingProcess h0 h1 (pdlist!!0) ap0 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", False)]
+    -- second review
+    reviewingProcess h0 h2 (pdlist!!1) ap2 rp scriptAdd $ Map.fromList [("ReviewersLate", True), ("AuthorsLate", False)]
+    -- third review
+    reviewingProcess h0 h3 (pdlist!!2) ap3 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", True)]
 
 
+-------------------
+reviewingProcess ::
+    ContractHandle () PaperSchema Text
+    -> ContractHandle () PaperSchema Text
+    -> [PaperDecision]
+    -> AuthorParams
+    -> ReviewerParams
+    -> Address
+    -> Map.Map String Bool
+    -> EmulatorTrace ()
+reviewingProcess authorWallet reviewerWallet pds aparams rparams addr passedDealine = do
+    callEndpoint @"paperSubmission" authorWallet aparams
+    void $ Emulator.waitNSlots 9
+    loop pds rparams
+    callEndpoint @"reviewerAction" reviewerWallet (rparams{rpDecision = last pds})
+    void $ Emulator.waitNSlots 1
+    logWalletUtxos "FINAL Script" (addr)
+  where
+    loop [] _ = return ()
+    loop (pd:pds') revparams = do
+        let rparams' = revparams{rpDecision = pd}
+        callEndpoint @"reviewerAction" reviewerWallet rparams'
+        void $ Emulator.waitNSlots (if Map.lookup "AuthorsLate" passedDealine == Just True then 11 else 10)
+        logWalletUtxos "Script" (addr)
+        callEndpoint @"authorAction" authorWallet aparams
+        void $ Emulator.waitNSlots (if Map.lookup "ReviewersLate" passedDealine == Just True then 11 else 10)
+        logWalletUtxos "Author" (mockWalletAddress w1)
+        logWalletUtxos "Script" (addr)
+        loop pds' rparams'
+
+
+-----Utils
 
 getUtxos :: Address -> Emulator.EmulatorTrace [(TxOutRef, ChainIndexTxOut)]
 getUtxos addr = do
@@ -159,6 +161,13 @@ getUtxos addr = do
                     fromTxOut o) [(oref, o) | (oref, o) <- Map.toList utxoIndex, txOutAddress o == addr]
     return utxos
 
+logWalletUtxos :: String -> Address -> EmulatorTrace ()
+logWalletUtxos role address = do
+    finalUtxos <- getUtxos address
+    Extras.logInfo $ "Current " ++ role ++ " UTXOS: " ++ show finalUtxos
+
+
+---- Not used
 
 findMyDat :: Address -> Emulator.EmulatorTrace (Maybe PaperDatum)
 findMyDat addr = do

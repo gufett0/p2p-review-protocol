@@ -1,5 +1,9 @@
 # mesposito_CDP
- My final project for the Cardano Professional Developer certificate
+
+## Introduction
+`peer-to-peer review` is a proof of concept exercise that shows how a decentralized, blockchain-based system could be used to establish the quality and credibility of academic papers. By allowing a large number of reviewers (i.e. identified peers) to participate in a transparent way, the system aims at incentivizing a thorough and honest feedback without the need of centralized authorities or intermediaries (e.g journals, peer-review platforms, conference organizers). For more information on promoting transparency, inclusivity, and accountability in the peer review process, you can learn more about open peer review.
+
+## Diagram
 
 ```mermaid
 stateDiagram-v2
@@ -17,3 +21,6 @@ note right of Closed : Author has ended\n review process
 Reviewed --> Consumed_UTXO : Claim Reviewer
 Reviewed --> Submitted : Revision   
 ```
+
+## Cardano Professional Developer 
+Find Certificate at this link
