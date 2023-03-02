@@ -15,7 +15,7 @@ Closed --> Locked_UTXO : Claim Reviewer
 Locked_UTXO --> [*]
 note right of Submitted : Author has (re)submitted paper
 note left of Reviewed : Reviewer has requested\n minor/major revision
-note left of Locked_UTXO : Final datum + 1 NFT
+note left of Locked_UTXO : Final datum + 1 NFT \n1 NFT back to the author
 note right of Consumed_UTXO : 2 NFTs back to the author
 note right of Closed : Author has ended\n review process
 Reviewed --> Consumed_UTXO : Claim Reviewer
