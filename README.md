@@ -7,26 +7,24 @@
 
 ```mermaid
 stateDiagram-v2
-direction LR
+direction TB
 state Script_UTXO1 {
 state Empty <<fork>>
 state Final <<choice>>
 [*] --> Submitted  : <i>Created UTXO\n (2 NFTs + Datum)</i>  
---
 Submitted --> Reviewed : <b>Updated At</b> 
 Reviewed --> Submitted : <b>Revision </b> 
 Submitted --> Final : <b>Claim Author</b> 
-Reviewed --> Closed : <b>Closed At</b> 
 Reviewed --> Final : <b>Claim Reviewer</b> 
+Reviewed --> Closed : <b>Closed At</b> 
 Closed --> Final : <b>Claim Reviewer</b> 
 Final --> [*] : <i>Locked UTXO\n (1 NFT + Datum)</i> 
 Final --> Empty : <i>Consumed UTXO\n (2 NFTs back to author)</i> 
---
 state Endpoints {
-note right of Final : Funds are \n redistributed \n accordingly
-note right of Submitted : Author has (re)submitted paper
-note right of Reviewed : Reviewer has requested\n minor/major revision
-note right of Closed : Author has ended\n review process
+note left of Closed : Author has ended\n review process
+note left of Final : Funds are \n redistributed \n accordingly
+note left of Reviewed : Reviewer has requested\n minor/major revision
+note left of Submitted : Author has (re)submitted paper
 }
 }
 ```
