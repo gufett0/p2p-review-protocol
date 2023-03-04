@@ -1,9 +1,21 @@
-# mesposito_CDP
-
+# CDP Project
 ## Introduction
-`peer-to-peer review` is a proof of concept exercise that shows how a decentralized, blockchain-based system could be used to establish the quality and credibility of academic papers. By allowing a large number of reviewers (i.e. identified peers) to participate in a transparent way, the system aims at incentivizing a thorough and honest feedback without the need of centralized authorities or intermediaries (e.g journals, peer-review platforms, conference organizers). For more information on promoting transparency, inclusivity, and accountability in the peer review process, you can learn more about open peer review.
+A "peer-to-peer review" is a proof of concept exercise that shows how a decentralized, blockchain-based system could be used to establish the quality and credibility of academic papers. By allowing a large number of reviewers (i.e. identified peers) to participate in a transparent way, the system aims at incentivizing a thorough and honest behaviour without the need of centralized authorities or intermediaries (e.g journals, peer-review platforms, conference organizers). For more information on promoting transparency, inclusivity, and accountability in the peer review process, you can learn more about [open peer review](https://www.fosteropenscience.eu/learning/open-peer-review/#/id/5a17e150c2af651d1e3b1bce).
 
-#### Review process
+Here: 
+- <b>Transparency</b> is guaranteed by the Cardano blockchain history, where information like reviewer's final decision, a link to the documents in a  decentralized version control system (e.g. ipfs textile bucket), number of paper revisions and the reviewer's public key hash (or a name handle for a more transparent solution) is stored and retrievable (e.g. by [Blockfrost query](https://docs.blockfrost.io/#tag/Cardano-Scripts/paths/%7E1scripts%7E1datum%7E1%7Bdatum_hash%7D/get)); 
+
+- <b>Inclusivity</b> is fostered by allowing any peer, i.e., accredited subject matter expert, to voluntarily participate in the reviewing process, rather than being limited to a pre-selected number based on internal decisions made by the editors; 
+
+- <b>Accountability</b> is achieved by requiring reviewers to place a predefined stake that they may lose if they fail to meet their reviewing responsibilities and deadlines.
+
+
+
+
+## Reviewing Process
+
+The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and tranistion lines respectively. Finally, 
+
 
 
 ```mermaid
@@ -30,7 +42,10 @@ note left of Submitted : Author has (re)submitted paper
 }
 ```
 
-#### Concurrent implementation
+#### Concurrent Approach
+According to [IOG](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/), enabling concurrency is crucial for facilitating multiple actors to work simultaneously on a given task without causing interference with each other. Therefore, conducting the reviewing process in parallel within the same smart contract can be a more efficient approach.
+
+To enable parallel execution of the reviewing process within the same smart contract, it is necessary to track the UTXO where validation for a specific transactions occurs. This can be achieved by storing a pair of NFTs, whose name and policy are included in the script parameter, for each UTXO created at the script address and including a field with the payment public key hash of the reviewer in the datum of every UTXO. This ensures that the validation activity of both reviewers and authors is accurately recorded and tracked. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that ....
 
 ```mermaid
 stateDiagram-v2
