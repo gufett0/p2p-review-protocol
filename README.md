@@ -8,7 +8,7 @@
 ```mermaid
 stateDiagram-v2
 direction TB
-state ReviewProcess_UTXO1 {
+state Script_UTXO1 {
 state Empty <<fork>>
 state Final <<choice>>
 [*] --> Submitted  : <i>Created UTXO\n (2 NFTs + Datum)</i>  
