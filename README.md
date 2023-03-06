@@ -4,7 +4,10 @@ A "peer-to-peer review" is a proof of concept exercise that shows how a decentra
 
 
 #### Assumptions
-The goal of this project is to show a potential mechanism for the reviewing process, assuming that other elements of a decentralized editorial ecosystem are in place:
+The goal of this project is to show a viable mechanism for a reviewing process (the green-framed box in the picture), assuming that other elements of a decentralized, permisionless and censorship-resistant academic ecosystem are in place:
+
+![Screenshot 2023-03-06 at 19 50 41](https://user-images.githubusercontent.com/104091627/223203427-68435d17-262c-4a6d-8542-270d197d25a9.png)
+
 
 
 
