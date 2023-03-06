@@ -2,7 +2,13 @@
 ## Introduction
 A "peer-to-peer review" is a proof of concept exercise that shows how a decentralized, blockchain-based system could be used to establish the quality and credibility of academic papers. By allowing a large number of reviewers (i.e. identified peers) to participate in a transparent way, the system aims at incentivizing a thorough and honest behaviour without the need of centralized authorities or intermediaries (e.g journals, peer-review platforms, conference organizers). For more information on promoting transparency, inclusivity, and accountability in the peer review process, you can learn more about [open peer review](https://www.fosteropenscience.eu/learning/open-peer-review/#/id/5a17e150c2af651d1e3b1bce).
 
-Here: 
+
+#### Assumptions
+The goal of this project is to show a potential mechanism for the reviewing process, assuming that other elements of a decentralized editorial ecosystem are in place:
+
+
+
+#### Objectives 
 - <b>Transparency</b> is guaranteed by the Cardano blockchain history, where information like reviewer's final decision, a link to the documents in a  decentralized version control system (e.g. ipfs textile bucket), number of paper revisions and the reviewer's public key hash (or a name handle for a more transparent solution) is stored and retrievable (e.g. by [Blockfrost query](https://docs.blockfrost.io/#tag/Cardano-Scripts/paths/%7E1scripts%7E1datum%7E1%7Bdatum_hash%7D/get)); 
 
 - <b>Inclusivity</b> is fostered by allowing any peer, i.e., accredited subject matter expert, to voluntarily participate in the reviewing process, rather than being limited to a pre-selected number based on internal decisions made by the editors; 
@@ -63,22 +69,22 @@ stateDiagram-v2
         --
         state ID_02 {
         [*] --> Reviewing_2
-        Reviewing_2 --> Reviewing_2
+        Reviewing_2 --> Reviewing_2: Validator
         Reviewing_2 --> Final2
-        Final2 --> Empty2 
-        Final2 --> <b>UTXO2</b> 
-        <b>UTXO2</b> --> [*] 
+        Final2 --> Empty2 : Invalid
+        Final2 --> <b>UTXO2</b> : Valid
+        <b>UTXO2</b> --> [*] : Final Datum
         }
         --
         ...
         --
         state ID_n {
         [*] --> Reviewing_n
-        Reviewing_n --> Reviewing_n
+        Reviewing_n --> Reviewing_n: Validator
         Reviewing_n --> Final3
-        Final3 --> Empty3 
-        Final3 --> <b>UTXOn</b> 
-        <b>UTXOn</b> --> [*] 
+        Final3 --> Empty3 : Invalid
+        Final3 --> <b>UTXOn</b> : Valid
+        <b>UTXOn</b> --> [*] : Final Datum
         }
     }
 ```
