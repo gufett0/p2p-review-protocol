@@ -9,14 +9,10 @@ Here:
 
 - <b>Accountability</b> is achieved by requiring reviewers to place a predefined stake that they may lose if they fail to meet their reviewing responsibilities and deadlines.
 
-
-
-
 ## Reviewing Process
 
-The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and tranistion lines respectively. Finally, 
-
-
+#### Transactions flowchart 
+The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and tranistion lines respectively. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that the other NFT will be locked in the script along with the datum containing the final review info.
 
 ```mermaid
 stateDiagram-v2
@@ -35,7 +31,7 @@ Final --> [*] : <i>Locked UTXO\n (1 NFT + Datum)</i>
 Final --> Empty : <i>Consumed UTXO\n (2 NFTs back to author)</i> 
 state Endpoints {
 note left of Closed : Author has ended\n review process
-note left of Final : Funds are \n redistributed \n accordingly
+note left of Final : Funds are \n redistributed \n according to \n script logic
 note left of Reviewed : Reviewer has requested\n minor/major revision
 note left of Submitted : Author has (re)submitted paper
 }
@@ -45,7 +41,7 @@ note left of Submitted : Author has (re)submitted paper
 #### Concurrent Approach
 According to [IOG](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/), enabling concurrency is crucial for facilitating multiple actors to work simultaneously on a given task without causing interference with each other. Therefore, conducting the reviewing process in parallel within the same smart contract can be a more efficient approach.
 
-To enable parallel execution of the reviewing process within the same smart contract, it is necessary to track the UTXO where validation for a specific transactions occurs. This can be achieved by storing a pair of NFTs, whose name and policy are included in the script parameter, for each UTXO created at the script address and including a field with the payment public key hash of the reviewer in the datum of every UTXO. This ensures that the validation activity of both reviewers and authors is accurately recorded and tracked. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that ....
+To enable parallel execution of the reviewing process within the same smart contract, it is necessary to track the UTXO where validation for a specific transactions occurs. This can be achieved by storing a pair of NFTs, whose name and policy are included in the script parameter, for each UTXO created at the script address and including a field with the payment public key hash of the reviewer in the datum of every UTXO. This ensures that the validation activity of both reviewers and authors is accurately recorded and tracked. 
 
 ```mermaid
 stateDiagram-v2
