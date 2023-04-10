@@ -31,7 +31,10 @@ import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
 import           Prelude                    (IO, Show (..), String, div, last)
 import           Wallet.Emulator.Wallet
-
+{-
+import           Cardano.Wallet.Api
+import Ledger.Index 
+import           Plutus.Contract -}
 
 
 paperReviewTokenCurrency :: CurrencySymbol
@@ -39,6 +42,16 @@ paperReviewTokenCurrency = "2023"
 
 paperReviewToken :: TokenName
 paperReviewToken = "PaperReviewToken"
+
+{-
+peerIdTokenCurrency :: CurrencySymbol
+peerIdTokenCurrency = "20231"
+
+peerIdToken01, peerIdToken02, peerIdToken03 :: TokenName
+peerIdToken01 = "PeerIdentityToken01"
+peerIdToken02 = "PeerIdentityToken02"
+peerIdToken03 = "PeerIdentityToken03"
+-}
 
 w1, w2, w3, w4 :: Wallet
 w1 = knownWallet 1
@@ -59,9 +72,9 @@ test pdlist = runEmulatorTraceIO' def emCfg $ myTrace pdlist
     emCfg :: EmulatorConfig
     emCfg = def { _initialChainState = Left $ Map.fromList
                     [ (w1, v <> assetClassValue (AssetClass (paperReviewTokenCurrency, paperReviewToken)) 6)
-                    , (w2, v)
-                    , (w3, v)
-                    , (w4, v)
+                    , (w2, v )
+                    , (w3, v )
+                    , (w4, v )
                     ]
                 }
 
@@ -83,6 +96,7 @@ myTrace pdlist = do
       author           = mockWalletPaymentPubKeyHash w1
     , stake            = 100_000_000
     , reward           = stake mypaper `div` 2
+    , minNumPeers      = 3
     , timeInterval     = POSIXTime {getPOSIXTime = 10_000}
     , paperNFT         = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
     } 
@@ -90,34 +104,55 @@ myTrace pdlist = do
     let pkh_reviewer1   = mockWalletPaymentPubKeyHash w2
         pkh_reviewer2   = mockWalletPaymentPubKeyHash w3
         pkh_reviewer3   = mockWalletPaymentPubKeyHash w4
-        fileIpns  = Manuscript "ipns_address"
+        fileIpns  = Manuscript "/ipns/QmS4ust...4uVv"
+        finalNFT  = "PeerReviewedNFT./ipns/QmS4ust...4uVv"
         scriptAdd = paperAddress mypaper      
         ap0 = AuthorParams 
-                        { upReviewer        = pkh_reviewer1
+                        { upReviewer        = Just pkh_reviewer1
                         , upStake           = stake mypaper
                         , upReward          = reward mypaper
+                        , upNumPeers        = minNumPeers mypaper
                         , upTimeToDeadline  = timeInterval mypaper
                         , upCurrency        = paperReviewTokenCurrency
                         , upTokenName       = paperReviewToken
                         , upManuscript      = fileIpns
                         }
-        ap2 = ap0{upReviewer = pkh_reviewer2}
-        ap3 = ap0{upReviewer = pkh_reviewer3}
+        ap2 = ap0{upReviewer = Just pkh_reviewer2}
+        ap3 = ap0{upReviewer = Just pkh_reviewer3}
         rp = ReviewerParams
                         { rpAuthor         = author mypaper
                         , rpStake          = stake mypaper
                         , rpReward         = reward mypaper
+                        , rpNumPeers       = minNumPeers mypaper
                         , rpTimeToDeadline = timeInterval mypaper
                         , rpCurrency       = paperReviewTokenCurrency
                         , rpTokenName      = paperReviewToken
                         }
+        cp = CloseParams
+                        { ppAuthor         = author mypaper
+                        , ppStake          = stake mypaper
+                        , ppReward         = reward mypaper
+                        , ppNumPeers       = minNumPeers mypaper
+                        , ppTimeToDeadline = timeInterval mypaper
+                        , ppCurrency       = paperReviewTokenCurrency
+                        , ppTokenName      = paperReviewToken
+                        , ppFinalManuscript= fileIpns
+                        , ppFinalNFTName   = finalNFT
+                        }                 
 
     -- first review
     reviewingProcess h0 h1 (pdlist!!0) ap0 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", False)]
     -- second review
-    reviewingProcess h0 h2 (pdlist!!1) ap2 rp scriptAdd $ Map.fromList [("ReviewersLate", True), ("AuthorsLate", False)]
+    reviewingProcess h0 h2 (pdlist!!1) ap2 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", False)]
     -- third review
-    reviewingProcess h0 h3 (pdlist!!2) ap3 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", True)]
+    reviewingProcess h0 h3 (pdlist!!2) ap3 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", False)]
+
+    callEndpoint @"closeAction" h0 cp 
+    void $ Emulator.waitNSlots 5
+    
+    logWalletUtxos "FINAL AUTHOR" (mockWalletAddress w1)
+    logWalletUtxos "FINAL SCRIPT" (scriptAdd)
+    
 
 
 -------------------
@@ -135,8 +170,8 @@ reviewingProcess authorWallet reviewerWallet pds aparams rparams addr passedDeal
     void $ Emulator.waitNSlots 9
     loop pds rparams
     callEndpoint @"reviewerAction" reviewerWallet (rparams{rpDecision = last pds})
-    void $ Emulator.waitNSlots 1
-    logWalletUtxos "FINAL Script" (addr)
+    void $ Emulator.waitNSlots 5
+
   where
     loop [] _ = return ()
     loop (pd:pds') revparams = do
@@ -166,8 +201,8 @@ logWalletUtxos role address = do
     finalUtxos <- getUtxos address
     Extras.logInfo $ "Current " ++ role ++ " UTXOS: " ++ show finalUtxos
 
-
 ---- Not used
+
 
 findMyDat :: Address -> Emulator.EmulatorTrace (Maybe PaperDatum)
 findMyDat addr = do

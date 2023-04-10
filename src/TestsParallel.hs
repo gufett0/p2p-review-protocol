@@ -17,7 +17,6 @@ import           Types
 import           TxConstruction
 import           ReviewContract         
 import           Control.Monad              hiding (fmap)
-import           Control.Monad.Freer.Extras as Extras
 import           Data.Default               (Default (..))
 import qualified Data.Map                   as Map
 import           Ledger
@@ -37,6 +36,15 @@ paperReviewTokenCurrency = "2023"
 paperReviewToken :: TokenName
 paperReviewToken = "PaperReviewToken"
 
+
+peerIdTokenCurrency :: CurrencySymbol
+peerIdTokenCurrency = "3023"
+
+peerIdToken01, peerIdToken02, peerIdToken03 :: TokenName
+peerIdToken01 = "PeerIdentityToken01"
+peerIdToken02 = "PeerIdentityToken02"
+peerIdToken03 = "PeerIdentityToken03"
+
 w1, w2, w3 :: Wallet
 w1 = knownWallet 1
 w2 = knownWallet 2
@@ -48,8 +56,8 @@ test' = runEmulatorTraceIO' def emCfg $ myTrace'
     emCfg :: EmulatorConfig
     emCfg = def { _initialChainState = Left $ Map.fromList
                     [ (w1, v <> assetClassValue (AssetClass (paperReviewTokenCurrency, paperReviewToken)) 4)
-                    , (w2, v)
-                    , (w3, v)
+                    , (w2, v <> assetClassValue (AssetClass (peerIdTokenCurrency, peerIdToken01)) 1)
+                    , (w3, v <> assetClassValue (AssetClass (peerIdTokenCurrency, peerIdToken02)) 1)
                     ]
                 }
     v :: Value
@@ -68,6 +76,7 @@ myTrace'  = do
       author           = mockWalletPaymentPubKeyHash w1
     , stake            = 100_000_000
     , reward           = stake mypaper `div` 2
+    , minNumPeers      = 3
     , timeInterval     = POSIXTime {getPOSIXTime = 10_000}
     , paperNFT         = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
     } 
@@ -77,23 +86,37 @@ myTrace'  = do
         fileIpns  = Manuscript "ipns_address"
         scriptAdd = paperAddress mypaper      
         ap0 = AuthorParams 
-                        { upReviewer        = pkh_reviewer1
+                        { upReviewer        = Just pkh_reviewer1
                         , upStake           = stake mypaper
                         , upReward          = reward mypaper
+                        , upNumPeers        = minNumPeers mypaper
                         , upTimeToDeadline  = timeInterval mypaper
                         , upCurrency        = paperReviewTokenCurrency
                         , upTokenName       = paperReviewToken
                         , upManuscript      = fileIpns
                         }
-        ap2 = ap0{upReviewer = pkh_reviewer2}
+        ap2 = ap0{upReviewer = Just pkh_reviewer2}
         rp = ReviewerParams
                         { rpAuthor         = author mypaper
                         , rpStake          = stake mypaper
                         , rpReward         = reward mypaper
+                        , rpNumPeers       = minNumPeers mypaper
                         , rpTimeToDeadline = timeInterval mypaper
                         , rpCurrency       = paperReviewTokenCurrency
                         , rpTokenName      = paperReviewToken
                         }
+        
+        cp = CloseParams
+                        { ppAuthor         = author mypaper
+                        , ppStake          = stake mypaper
+                        , ppReward         = reward mypaper
+                        , ppNumPeers       = minNumPeers mypaper
+                        , ppTimeToDeadline = timeInterval mypaper
+                        , ppCurrency       = paperReviewTokenCurrency
+                        , ppTokenName      = paperReviewToken
+                        , ppFinalManuscript= fileIpns
+                        }    
+
 
     callEndpoint @"paperSubmission" h0 ap0 -- X
     void $ Emulator.waitNSlots 3   
@@ -118,7 +141,10 @@ myTrace'  = do
 
     callEndpoint @"reviewerAction" h2 rp{rpDecision = Reject} -- Y
     void $ Emulator.waitNSlots 3
-
+{-
+    callEndpoint @"closeAction" h0 cp 
+    void $ Emulator.waitNSlots 5
+-}
     callEndpoint @"authorAction" h0 ap0 -- X 
     void $ Emulator.waitNSlots 3
 
@@ -132,3 +158,4 @@ myTrace'  = do
     void $ Emulator.waitNSlots 3
 
     logWalletUtxos "Script" (scriptAdd)
+    logWalletUtxos "Author" (mockWalletAddress w1)
