@@ -22,7 +22,6 @@ import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (FromJSON, ToJSON)
 import qualified Data.Map             as Map
 import           Data.Text            (Text)
-import           GHC.Generics         (Generic)
 import           Ledger               hiding (singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
