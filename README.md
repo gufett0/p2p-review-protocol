@@ -72,7 +72,7 @@ stateDiagram-v2
         Reviewing_1 --> Final
         Final --> Empty : Invalid
         Final --> <b>Locked1</b> : Valid
-        <b>Locked1</b> --> [*] : Final Decision  <i>Accept</i> 
+        <b>Locked1</b> --> [*] : Final decision  <i>Accept</i> 
         }
         --
         state UTXO2 {
@@ -81,7 +81,7 @@ stateDiagram-v2
         Reviewing_2 --> Final2
         Final2 --> Empty2 : Invalid
         Final2 --> <b>Locked2</b> : Valid
-        <b>Locked2</b> --> [*] : Final Decision  <i>Reject</i> 
+        <b>Locked2</b> --> [*] : Final decision  <i>Reject</i> 
         }
         --
         ...
@@ -92,7 +92,7 @@ stateDiagram-v2
         Reviewing_n --> Final3
         Final3 --> Empty3 : Invalid
         Final3 --> <b>Locked_n</b> : Valid
-        <b>Locked_n</b> --> [*] : Final Decision <i>Accept</i> 
+        <b>Locked_n</b> --> [*] : Final decision <i>Accept</i> 
         }
     }
 ```
