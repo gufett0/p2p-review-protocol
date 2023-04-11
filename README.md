@@ -19,9 +19,11 @@ The goal of this project is to show a viable mechanism for a reviewing process (
 - <b>Accountability</b> is achieved by requiring reviewers to place a predefined stake that they may lose if they fail to meet their reviewing responsibilities and deadlines.
 
 ## Reviewing Process
+The following diagrams are a simplification of the on-chain steps behind the reviewing process. Go [here](https://github.com/gufett0/mesposito_CDP/tree/main/src) for a more detailed description of the source code and testing scenarios. 
 
-#### Transactions flowchart 
-The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and tranistion lines respectively. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that the other NFT will be locked in the script along with the datum containing the final review info.
+
+#### Validator Txs flowchart 
+The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and tranistion lines respectively. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that the other NFT will be locked in the script along with the datum containing the final review info (i.e. whether the paper got eventually rejected or accepted by the reviewer).
 
 ```mermaid
 stateDiagram-v2
@@ -29,15 +31,15 @@ direction TB
 state UTXO1 {
 state Empty <<fork>>
 state Final <<choice>>
-[*] --> Submitted  : <i>Created UTXO\n (2 NFTs + Datum)</i>  
-Submitted --> Reviewed : <b>Updated At</b> 
+[*] --> Submitted  : <i>Created UTXO\n (2 Tokens + Datum)</i>  
+Submitted --> Reviewed : <b>UpdatedAt</b> 
 Reviewed --> Submitted : <b>Revision </b> 
-Submitted --> Final : <b>Claim Author</b> 
-Reviewed --> Final : <b>Claim Reviewer</b> 
-Reviewed --> Closed : <b>Closed At</b> 
-Closed --> Final : <b>Claim Reviewer</b> 
-Final --> [*] : <i>Locked UTXO\n (1 NFT + Datum)</i> 
-Final --> Empty : <i>Consumed UTXO\n (2 NFTs back to author)</i> 
+Submitted --> Final : <b>ClaimAuthor</b> 
+Reviewed --> Final : <b>ClaimReviewer</b> 
+Reviewed --> Closed : <b>ClosedAt</b> 
+Closed --> Final : <b>ClaimReviewer</b> 
+Final --> [*] : <i>Locked UTXO\n (1 Token + Datum)</i> 
+Final --> Empty : <i>Consumed UTXO\n (2 Tokens back to author)</i> 
 state Endpoints {
 note left of Closed : Author has ended\n review process
 note left of Final : Funds are \n redistributed \n according to \n script logic
@@ -47,10 +49,13 @@ note left of Submitted : Author has (re)submitted paper
 }
 ```
 
+
 #### Concurrent Approach
 According to [IOG](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/), enabling concurrency is crucial for facilitating multiple actors to work simultaneously on a given task without causing interference with each other. Therefore, conducting the reviewing process in parallel within the same smart contract can be a more efficient approach.
 
-To enable parallel execution of the reviewing process within the same smart contract, it is necessary to track the UTXO where validation for a specific transactions occurs. This can be achieved by storing a pair of NFTs, whose name and policy are included in the script parameter, for each UTXO created at the script address and including a field with the payment public key hash of the reviewer in the datum of every UTXO. This ensures that the validation activity of both reviewers and authors is accurately recorded and tracked. 
+To enable parallel execution of the reviewing process within the same smart contract, it is necessary to track the UTXO where validation for a specific transactions occurs. This can be achieved by storing a pair of NFTs, whose name and policy are included in the script parameter, for each UTXO created at the script address and including a field with the payment public key hash of the reviewer in the datum of every UTXO. This ensures that the validation activity of both reviewers and authors is accurately recorded and tracked (check the TestsParallel.hs code). 
+
+The below state diagram shows the Reviewing process occurring in parallel at different Utxos. 
 
 ```mermaid
 stateDiagram-v2
@@ -61,36 +66,40 @@ stateDiagram-v2
         state Empty <<fork>>
         state Empty2 <<fork>>
         state Empty3 <<fork>>
-        state ID_01 {
+        state UTXO1 {
         [*] --> Reviewing_1
         Reviewing_1 --> Reviewing_1: Validator
         Reviewing_1 --> Final
         Final --> Empty : Invalid
-        Final --> <b>UTXO1</b> : Valid
-        <b>UTXO1</b> --> [*] : Final Datum
+        Final --> <b>Locked1</b> : Valid
+        <b>Locked1</b> --> [*] : Final Decision  <i>Accept</i> 
         }
         --
-        state ID_02 {
+        state UTXO2 {
         [*] --> Reviewing_2
         Reviewing_2 --> Reviewing_2: Validator
         Reviewing_2 --> Final2
         Final2 --> Empty2 : Invalid
-        Final2 --> <b>UTXO2</b> : Valid
-        <b>UTXO2</b> --> [*] : Final Datum
+        Final2 --> <b>Locked2</b> : Valid
+        <b>Locked2</b> --> [*] : Final Decision  <i>Reject</i> 
         }
         --
         ...
         --
-        state ID_n {
+        state UTXOn {
         [*] --> Reviewing_n
         Reviewing_n --> Reviewing_n: Validator
         Reviewing_n --> Final3
         Final3 --> Empty3 : Invalid
-        Final3 --> <b>UTXOn</b> : Valid
-        <b>UTXOn</b> --> [*] : Final Datum
+        Final3 --> <b>Locked_n</b> : Valid
+        <b>Locked_n</b> --> [*] : Final Decision <i>Accept</i> 
         }
     }
 ```
+
+Once a minimum number of peers have reviewed the paper and most of final decisions are "Accept", each relevant UTXO may be consumed at the script address by the author to lock a new single UTXO with a final datum:
+
+
 
 
 
