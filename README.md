@@ -19,7 +19,7 @@ The goal of this project is to show a viable mechanism for a reviewing process (
 - <b>Accountability</b> is achieved by requiring reviewers to place a predefined stake that they may lose if they fail to meet their reviewing responsibilities and deadlines.
 
 ## Reviewing Process
-The following diagrams are a simplification of the on-chain steps behind the reviewing process. Go [here](https://github.com/gufett0/mesposito_CDP/tree/main/src) for a more detailed description of the source code and testing scenarios. 
+The following diagrams are a simplification of the on-chain steps behind the reviewing process. Go [here](https://github.com/gufett0/mesposito_CDP/tree/main/src) for a description of the source code and testing scenarios. 
 
 
 #### Validator Txs flowchart 
@@ -48,7 +48,6 @@ note left of Submitted : Author has (re)submitted paper
 }
 }
 ```
-
 
 #### Concurrent Approach
 According to [IOG](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/), enabling concurrency is crucial for facilitating multiple actors to work simultaneously on a given task without causing interference with each other. Therefore, conducting the reviewing process in parallel within the same smart contract can be a more efficient approach.
@@ -97,7 +96,37 @@ stateDiagram-v2
     }
 ```
 
-Once a minimum number of peers have reviewed the paper and most of final decisions are "Accept", each relevant UTXO may be consumed at the script address by the author to lock a new single UTXO with a final datum:
+So, each locked utxo will have a datum like this:
+
+```
+PaperDatum{
+d_linkToManuscript    = Manuscript "/ipns/QmS4ust...4uVv",
+d_reviewerPkh         = "557d23c0a533b4d295ac2dc14b783a7efc293bc23ede88a6fefd203d",  
+d_currentDecision     = Just Minor,
+d_nextDeadline        = Just (now + POSIXTime {getPOSIXTime = 10_000}),
+d_status              = Submitted (Round 2),
+d_allRevDecisions     = Nothing,
+d_peerReviewed        = False
+}
+
+```
+
+
+
+Once a minimum number of peers have reviewed the paper and most of final decisions are "Accept", each relevant UTXO may be consumed at the script address by the author to lock a new single UTXO with a final "peer-reviewed" datum:
+
+```
+PaperDatum{
+d_linkToManuscript    = Manuscript "/ipns/QmS4ust...4uVv",
+d_reviewerPkh         = Nothing,  
+d_currentDecision     = Nothing,
+d_nextDeadline        = Nothing,
+d_status              = Closed (Round 0),
+d_allRevDecisions     = Just [(2e0a...a27c,Reject),(557d...203d,Accept),(80a4...3ca7,Accept)]
+d_peerReviewed        = True
+}
+
+```
 
 
 
