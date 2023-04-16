@@ -18,7 +18,7 @@ module TxConstruction where
 
 import           Types
 import           ReviewContract
-import           NFTMintingPolicy
+import           ReviewPolicy
 import           Utils
 import           Control.Monad          hiding (fmap)
 import           Data.Map               as Map
@@ -64,22 +64,22 @@ paperSubmission up = do
     now <- currentTime
     let paper = Paper 
                     { author         = pkh
-                    , reward         = upReward up
+                    , compensation   = upReward up
                     , stake          = upStake up
-                    , minNumPeers    = 3
+                    , minNumPeers    = upNumPeers up
                     , timeInterval   = upTimeToDeadline up
-                    , paperNFT       = AssetClass (upCurrency up, upTokenName up)
+                    , paperToken     = AssetClass (upCurrency up, upTokenName up)
                     }
-        v    = lovelaceValueOf (upStake up) <> assetClassValue (paperNFT paper) 2
+        v    = lovelaceValueOf (upStake up) <> assetClassValue (paperToken paper) 2
         time = now + (timeInterval paper)
         dat  = PaperDatum
-               { d_linkToManuscript  = upManuscript up 
+               { d_linkToManuscript   = upManuscript up 
                , d_reviewerPkh        = upReviewer up
                , d_currentDecision    = Nothing 
                , d_nextDeadline       = Just time 
                , d_status             = Submitted (Round 0)
                , d_allRevDecisions    = Nothing
-               , d_peerReviewed       = False 
+               , d_peerReviewed       = False
                }
         tx   = Constraints.mustPayToTheScript dat v  
     ledgerTx <- submitTxConstraints (typedPaperValidator paper) tx
@@ -106,11 +106,11 @@ reviewerAction rp = do
     pkh <- Plutus.Contract.ownPaymentPubKeyHash
     let paper = Paper 
                 { author         = rpAuthor rp
-                , reward         = rpReward rp
+                , compensation   = rpReward rp
                 , stake          = rpStake rp
                 , minNumPeers    = rpNumPeers rp
                 , timeInterval   = rpTimeToDeadline rp
-                , paperNFT       = AssetClass (rpCurrency rp, rpTokenName rp)
+                , paperToken     = AssetClass (rpCurrency rp, rpTokenName rp)
                 }
         addr  = paperAddress paper        
  
@@ -121,7 +121,7 @@ reviewerAction rp = do
             case d_status datum of
                 Closed _ -> do
                     logInfo @String "[reviewer] Author has closed the paper. Claiming rewards...." 
-                    let token     = assetClassValue (paperNFT paper) 1 
+                    let token     = assetClassValue (paperToken paper) 1 
                     let lookups   = Constraints.unspentOutputs (Map.singleton oref o) <>
                                     Constraints.otherScript (paperValidator paper) <>
                                     Constraints.typedValidatorLookups (typedPaperValidator paper) 
@@ -148,7 +148,7 @@ reviewerAction rp = do
                                 Left e  -> logInfo @String "Sorry, you passed the deadline to decide on the manuscript!"
                                 Right _ -> do
                                     logInfo @String "[reviewer] Author did not update or close the manuscript in time (datum was not updated)."
-                                    let tokens     = assetClassValue (paperNFT paper) 2                        
+                                    let tokens     = assetClassValue (paperToken paper) 2                        
                                     let lookups = Constraints.unspentOutputs (Map.singleton oref o) <>
                                                   Constraints.otherScript (paperValidator paper)
                                         tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData ClaimReviewer) <>
@@ -169,7 +169,7 @@ reviewerAction rp = do
                                     {-let x = case roundValue of
                                                 (Round r) | r > 0 -> (lovelaceValueOf $ (stake paper)*2 ) 
                                                 _ -> lovelaceValueOf (stake paper) -}
-                                    let tokens = assetClassValue (paperNFT paper) 2
+                                    let tokens = assetClassValue (paperToken paper) 2
                                     --let v = x <> tokens
                                     let v       = let y = lovelaceValueOf (stake paper) in y <> y <> tokens
                                         time = case d_nextDeadline datum of -- the last deadline gets extended by the hardcoded amount
@@ -213,11 +213,11 @@ authorAction up = do
     pkh <- Plutus.Contract.ownPaymentPubKeyHash
     let paper = Paper 
                 { author         = pkh
-                , reward         = upReward up
+                , compensation   = upReward up
                 , stake          = upStake up
                 , minNumPeers    = upNumPeers up
                 , timeInterval   = upTimeToDeadline up
-                , paperNFT       = AssetClass (upCurrency up, upTokenName up)
+                , paperToken     = AssetClass (upCurrency up, upTokenName up)
                 }
         addr  = paperAddress paper         
 
@@ -257,8 +257,8 @@ authorAction up = do
 
                             Just decision | (decision == Accept || decision == Reject) -> do
                                 logInfo @String "[author] Now building the tx with CLOSED datum..."
-                                let tokens     = assetClassValue (paperNFT paper) 2
-                                let v         = let x = lovelaceValueOf $ ((reward paper) + ((reward paper) `div` 2)) in x <> x <> tokens -- Value to the script should be e.g. 25+12.5, that'll go to reviewer
+                                let tokens     = assetClassValue (paperToken paper) 2
+                                let v         = let x = lovelaceValueOf $ ((compensation paper) + ((compensation paper) `div` 2)) in x <> x <> tokens -- Value to the script should be e.g. 25+12.5, that'll go to reviewer
                                     --No need for a new deadline here 
                                     up_status = let lastround = (\(Reviewed (Round r)) -> r) (d_status datum) in Closed (Round lastround) -- THIS KEEPS THE LAST ROUND!                                    
                                     ipns      = upManuscript up
@@ -278,7 +278,7 @@ authorAction up = do
 
                             Just decision | (decision == Minor || decision == Major) -> do
                                 logInfo @String "[author] Now building the tx with UPDATED datum..."
-                                let tokens    = assetClassValue (paperNFT paper) 2
+                                let tokens    = assetClassValue (paperToken paper) 2
                                 let v         = let x = lovelaceValueOf $ (1*stake paper) in x <> x <> tokens
                                     time = case d_nextDeadline datum of -- the last deadline gets extended by the hardcoded amount
                                                     Just t -> t + (timeInterval paper)
@@ -320,11 +320,11 @@ closeAction pp = do
     --pkh <- Plutus.Contract.ownPaymentPubKeyHash            
     let paper = Paper 
                 { author         = ppAuthor pp
-                , reward         = ppReward pp
+                , compensation   = ppReward pp
                 , stake          = ppStake pp
                 , minNumPeers    = ppNumPeers pp
                 , timeInterval   = ppTimeToDeadline pp
-                , paperNFT       = AssetClass (ppCurrency pp, ppTokenName pp)
+                , paperToken     = AssetClass (ppCurrency pp, ppTokenName pp)
                 }            
     -- find all the right utxos
     utxos <- findLockedPaperOutputs paper (paperAddress paper)
@@ -347,8 +347,9 @@ closeAction pp = do
                         tname   = ppFinalNFTName pp
                         orefs   = Map.keys utxos
                         orefs_a = Map.keys utxos_a
-                        nft     = Value.singleton (curSymbol (head orefs_a) tname) tname 1
-                        tokens  = assetClassValue (paperNFT paper) (num_rev * 2)
+                        currsym = curSymbol (paperAddress paper) (head orefs) tname
+                        nft     = Value.singleton currsym tname 1
+                        tokens  = assetClassValue (paperToken paper) (num_rev * 2)
                         out_dat = PaperDatum{
                                 d_linkToManuscript    = ppFinalManuscript pp,
                                 d_reviewerPkh         = Nothing,  
@@ -356,15 +357,17 @@ closeAction pp = do
                                 d_nextDeadline        = Nothing,
                                 d_status              = Closed (Round 0),
                                 d_allRevDecisions     = Just rev_list,
-                                d_peerReviewed        = True 
+                                d_peerReviewed        = True
                                 }
+                                
                     let lookups = Constraints.unspentOutputs (utxos <> utxos_a) <>
                                 Constraints.otherScript (paperValidator paper) <>
                                 Constraints.typedValidatorLookups (typedPaperValidator paper) <>
-                                Constraints.mintingPolicy (policy (head orefs_a) tname)      
+                                Constraints.mintingPolicy (policy (paperAddress paper) (head orefs) tname)      
                         tx      =  mconcat [Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ PeerReviewed (ppFinalManuscript pp) ) | oref <- orefs] <>
                                    mconcat [Constraints.mustSpendPubKeyOutput oref | oref <- orefs_a] <>
                                 Constraints.mustPayToTheScript (out_dat) (tokens <> adaValueOf (getAda minAdaTxOut)) <>
+                           --     Constraints.mustPayToPubKey (author paper) (nft <> adaValueOf (getAda minAdaTxOut)) <>
                                 Constraints.mustMintValue nft
                                                            
 

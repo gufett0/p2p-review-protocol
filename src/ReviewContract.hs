@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE TypeOperators         #-}
  
---{-# LANGUAGE NumDecimals #-}
+
 
 
 module ReviewContract where
@@ -24,7 +24,7 @@ import           Ledger               hiding (singleton)
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Value
 import qualified PlutusTx
-import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import           PlutusTx.Prelude     hiding (Semigroup(..), unless, show)
 
 data Reviewing
 instance Scripts.ValidatorTypes Reviewing where
@@ -51,18 +51,18 @@ mkPaperValidator paper dat red ctx =
 
         oneScriptInputTwoTokens :: Bool
         oneScriptInputTwoTokens =
-            let paperNFTValue = paperNFT paper
+            let tokenValue = paperToken paper
                 ownInputResolved = txOutValue $ txInInfoResolved $ case findOwnInput ctx of
                     Nothing -> traceError "paper input missing"
                     Just i  -> i
-            in assetClassValueOf ownInputResolved paperNFTValue  == 2   
+            in assetClassValueOf ownInputResolved tokenValue  == 2   
 
         allScriptInputsOneToken :: TxInfo -> Bool
         allScriptInputsOneToken txInfo =
             let authorAddr = pubKeyHashAddress (author paper) Nothing
                 scriptInputs = PlutusTx.Prelude.filter (\input -> txOutAddress (txInInfoResolved input) /= authorAddr) (txInfoInputs txInfo)
                 scriptInputsVal = PlutusTx.Prelude.map (txOutValue . txInInfoResolved) scriptInputs
-                inputsHaveOnePaperToken = List.all (\val -> assetClassValueOf val (paperNFT paper) == 1) scriptInputsVal
+                inputsHaveOnePaperToken = List.all (\val -> assetClassValueOf val (paperToken paper) == 1) scriptInputsVal
             in inputsHaveOnePaperToken
 
 
@@ -73,20 +73,21 @@ mkPeerReviewed paper _ red ctx = do
 
     let revDecision = getRevPkhAndDecision inDatums
     case (red) of
-        (PeerReviewed ms) ->
+        (PeerReviewed (Manuscript bs)) ->
 
             traceIfFalse "Error: Input  (Author) - Not signed"                                       (txSignedBy info (unPaymentPubKeyHash $ author paper)) &&
             traceIfFalse "Error: Input  (Script) - Value is less than minimum based on num of peers" (getInputValue txIn >= (minInput paper)) &&
             traceIfFalse "Error: Output (Script) - No more than min Ada must be locked"              (lovelaces (txOutValue ownOutput) == minADA) &&
             traceIfFalse "Error: Output (Script) - Missing locked tokens"                            (allTokensToScript) &&
+            traceIfFalse "Error: Output (Author) - Missing correct NFT mint"                         (checkNFTname bs) &&
             traceIfFalse "Error: Output (Datum)  - Wrong output datum"                               (outDatum == PaperDatum
-                                                                                                        { d_linkToManuscript   = ms
+                                                                                                        { d_linkToManuscript   = Manuscript bs
                                                                                                         , d_reviewerPkh        = Nothing
                                                                                                         , d_currentDecision    = Nothing
                                                                                                         , d_nextDeadline       = Nothing
                                                                                                         , d_status             = Closed (Round 0)
                                                                                                         , d_allRevDecisions    = Just revDecision
-                                                                                                        , d_peerReviewed       = True
+                                                                                                        , d_peerReviewed       = True 
                                                                                                         })                      
 
         _ -> 
@@ -117,8 +118,11 @@ mkPeerReviewed paper _ red ctx = do
         datHash = txOutDatumHash . txInInfoResolved <$> txIn
 
         allTokensToScript :: Bool
-        allTokensToScript = assetClassValueOf (valueLockedBy info $ ownHash ctx) (paperNFT paper) >= (minNumPeers paper*2)
+        allTokensToScript = assetClassValueOf (valueLockedBy info $ ownHash ctx) (paperToken paper) >= (minNumPeers paper*2)
 
+        checkNFTname :: BuiltinByteString -> Bool
+        checkNFTname bs = case flattenValue (txInfoMint info) of
+            [(_, tname, amt)] -> amt == 1 && (unTokenName tname) == "PeerReviewedNFT." `appendByteString` bs
 
 
 {-# INLINABLE mkReviewing #-}
@@ -141,7 +145,7 @@ mkReviewing paper dat red ctx =
             traceIfFalse "Error: Input   (Script)   - Invalid Value"          (lovelaces (txOutValue ownInput) == if r == 0 then stake paper else 2*stake paper) && 
             traceIfFalse "Error: Output  (Script)   - Invalid Value"          (lovelaces (txOutValue ownOutput) == (2*stake paper))  &&
             traceIfFalse "Error: Input   (Time)     - Too late"               (maybe False (\t -> to (t - 1) `contains` txInfoValidRange info) time) &&
-            traceIfFalse "Error: Output  (Script)   - Missing Tokens"         (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 2) &&
+            traceIfFalse "Error: Output  (Script)   - Missing Tokens"         (assetClassValueOf (txOutValue ownOutput) (paperToken paper) == 2) &&
             traceIfFalse "Error: Output  (Datum)    - Wrong output datum"     (outDatum == PaperDatum
                                                                                 { d_linkToManuscript   = Manuscript ipns
                                                                                 , d_reviewerPkh        = rev_pkh
@@ -167,7 +171,7 @@ mkReviewing paper dat red ctx =
             traceIfFalse "Error: Output  (Script)   - Invalid Value"          (lovelaces (txOutValue ownOutput) == (2*stake paper))  &&
             traceIfFalse "Error: Input   (Time)     - Too late"               (maybe False (\t -> to (t - 1) `contains` txInfoValidRange info) time) &&
             traceIfFalse "Error: Input   (Redeemer) - Wrong paper referenced" (ms == (d_linkToManuscript dat)) &&                   
-            traceIfFalse "Error: Output  (Script)   - Missing Tokens"         (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 2) &&
+            traceIfFalse "Error: Output  (Script)   - Missing Tokens"         (assetClassValueOf (txOutValue ownOutput) (paperToken paper) == 2) &&
             traceIfFalse "Error: Input   (Datum)    - Decision is final"      (notfinal == (Just Minor) || notfinal == (Just Major)) &&
             traceIfFalse "Error: Output  (Datum)    - Wrong output datum"     (outDatum == PaperDatum
                                                                                 { d_linkToManuscript   = Manuscript ipns
@@ -191,10 +195,10 @@ mkReviewing paper dat red ctx =
                }, ClosedAt ms) ->
             traceIfFalse "Error: Input   (Author)   - Not signed"             (txSignedBy info (unPaymentPubKeyHash $ author paper)) && 
             traceIfFalse "Error: Input   (Script)   - Invalid value"          (lovelaces (txOutValue ownInput) == (2*stake paper))  &&
-            traceIfFalse "Error: Output  (Script)   - Invalid value"          (lovelaces (txOutValue ownOutput) == ((stake paper) + (reward paper)))  &&
+            traceIfFalse "Error: Output  (Script)   - Invalid value"          (lovelaces (txOutValue ownOutput) == ((stake paper) + (compensation paper)))  &&
             traceIfFalse "Error: Input   (Time)     - Too late"               (maybe False (\t -> to (t - 1) `contains` txInfoValidRange info) lastdeadline) &&           
             traceIfFalse "Error: Input   (Redeemer) - Wrong paper referenced" (ms == (d_linkToManuscript dat)) &&                   
-            traceIfFalse "Error: Output  (Script)   - Missing tokens"         (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 2) &&            
+            traceIfFalse "Error: Output  (Script)   - Missing tokens"         (assetClassValueOf (txOutValue ownOutput) (paperToken paper) == 2) &&            
             traceIfFalse "Error: Input   (Datum)    - Not a final decision"   (final == (Just Accept) || final == (Just Reject)) &&
             traceIfFalse "Error: Output  (Datum)    - Wrong output datum"     (outDatum == PaperDatum
                                                                                 { d_linkToManuscript   = Manuscript ipns
@@ -206,7 +210,7 @@ mkReviewing paper dat red ctx =
                                                                                 , d_peerReviewed       = False
                                                                                 })
         --reviewer sees a Closed status
-        --paper review is OVER (reviewer claims his stake plus the reward).
+        --paper review is OVER (reviewer claims his stake plus the compensation).
         (PaperDatum
                { d_linkToManuscript   = Manuscript _
                , d_reviewerPkh        = rev_pkh
@@ -217,8 +221,8 @@ mkReviewing paper dat red ctx =
                , d_peerReviewed       = False
                }, ClaimReviewer) ->
             traceIfFalse "Error: Input   (Reviewer) - Not signed"             (maybe False (txSignedBy info . unPaymentPubKeyHash) rev_pkh) && 
-            traceIfFalse "Error: Input   (Script)   - Invalid value"          (lovelaces (txOutValue ownInput) == ((stake paper) + (reward paper)))  &&
-            traceIfFalse "Error: Output  (Script)   - Missing token"          (assetClassValueOf (txOutValue ownOutput) (paperNFT paper) == 1) &&
+            traceIfFalse "Error: Input   (Script)   - Invalid value"          (lovelaces (txOutValue ownInput) == ((stake paper) + (compensation paper)))  &&
+            traceIfFalse "Error: Output  (Script)   - Missing token"          (assetClassValueOf (txOutValue ownOutput) (paperToken paper) == 1) &&
             traceIfFalse "Error: Output  (Author)   - Missing token"           singleTokenToAuthor &&
             traceIfFalse "Error: Output  (Datum)    - Wrong output datum"     (outDatum == dat)
 
@@ -247,7 +251,7 @@ mkReviewing paper dat red ctx =
                , d_nextDeadline       = time 
                , d_status             = Submitted _
                , d_allRevDecisions    = Nothing
-               , d_peerReviewed       = False
+               , d_peerReviewed       = False 
                }, ClaimAuthor) ->
             traceIfFalse "Error: Input   (Author)   - Not signed"             (txSignedBy info (unPaymentPubKeyHash $ author paper)) &&
             traceIfFalse "Error: Input   (Script)   - Invalid value"          (lovelaces (txOutValue ownInput) >= stake paper)  &&
@@ -278,10 +282,10 @@ mkReviewing paper dat red ctx =
                         Just d  -> d        
 
         singleTokenToAuthor :: Bool
-        singleTokenToAuthor = assetClassValueOf (valuePaidTo info $ unPaymentPubKeyHash $ author paper) (paperNFT paper) == 1
+        singleTokenToAuthor = assetClassValueOf (valuePaidTo info $ unPaymentPubKeyHash $ author paper) (paperToken paper) == 1
 
         pairTokensToAuthor :: Bool
-        pairTokensToAuthor = assetClassValueOf (valuePaidTo info $ unPaymentPubKeyHash $ author paper) (paperNFT paper) == 2
+        pairTokensToAuthor = assetClassValueOf (valuePaidTo info $ unPaymentPubKeyHash $ author paper) (paperToken paper) == 2
 
 
 -------

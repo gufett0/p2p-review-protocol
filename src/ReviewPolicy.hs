@@ -12,8 +12,7 @@
 {-# LANGUAGE TypeOperators         #-}
  
 
-
-module NFTMintingPolicy where
+module ReviewPolicy where
 
 import           Types
 import           Utils
@@ -32,33 +31,51 @@ import           Plutus.Contract      as Contract
 import qualified PlutusTx
 import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
 import           Prelude              (Semigroup (..), Show (..), String)
-
-
+import           Plutus.V1.Ledger.Credential(StakingCredential(..) , Credential(..))
 
 
 {-# INLINABLE nftMintingPolicy  #-}
-nftMintingPolicy :: TxOutRef -> TokenName -> () -> ScriptContext -> Bool
-nftMintingPolicy oref tname () ctx = traceIfFalse "UTxO not consumed" hasUTxO   &&
-                                          traceIfFalse "Wrong ammount minted" checkMintedAmount
+nftMintingPolicy :: Address -> TxOutRef -> TokenName -> () -> ScriptContext -> Bool
+nftMintingPolicy addr oref tname () ctx = traceIfFalse "UTxO not consumed" hasUTxO &&
+                                    traceIfFalse "Wrong ammount minted" checkMintedAmount &&
+                                    traceIfFalse "Inputs from script address are not being validated" (scriptInput /= Nothing)
   where
     info :: TxInfo
     info = scriptContextTxInfo ctx
+    
+    txIn :: [TxInInfo]
+    txIn = txInfoInputs info
 
     hasUTxO :: Bool
-    hasUTxO =  any (\utxo -> txInInfoOutRef utxo == oref) $ txInfoInputs info
+    hasUTxO =  any (\utxo -> txInInfoOutRef utxo == oref) $ txIn
 
     checkMintedAmount :: Bool
     checkMintedAmount =  case flattenValue (txInfoMint info) of
         [(_,tname', amount)]  -> tname' == tname && amount == 1
         _                     -> False
+ 
+    scriptInput :: Maybe TxInInfo
+    scriptInput = case find (isScriptAddress . txOutAddress . txInInfoResolved) txIn of
+                    Just i -> Just i
+                    Nothing -> Nothing
 
-policy :: TxOutRef -> TokenName -> Scripts.MintingPolicy
-policy oref tname = mkMintingPolicyScript $
-             $$(PlutusTx.compile [|| \oref' tname' -> Scripts.wrapMintingPolicy $ nftMintingPolicy oref' tname' ||])
+    isScriptAddress :: Address -> Bool
+    isScriptAddress (Address { addressCredential = ScriptCredential vh
+                            , addressStakingCredential = Nothing
+                            }) = Just vh == (toValidatorHash addr)
+    isScriptAddress _ = False
+
+
+
+policy :: Address -> TxOutRef -> TokenName -> Scripts.MintingPolicy
+policy add oref tname = mkMintingPolicyScript $
+             $$(PlutusTx.compile [|| \add' oref' tname' -> Scripts.wrapMintingPolicy $ nftMintingPolicy add' oref' tname' ||])
+             `PlutusTx.applyCode`
+             PlutusTx.liftCode add
              `PlutusTx.applyCode`
              PlutusTx.liftCode oref
              `PlutusTx.applyCode`
              PlutusTx.liftCode tname
 
-curSymbol :: TxOutRef -> TokenName -> CurrencySymbol
-curSymbol oref tname = scriptCurrencySymbol $ policy oref tname        
+curSymbol :: Address -> TxOutRef -> TokenName -> CurrencySymbol
+curSymbol add oref tname = scriptCurrencySymbol $ policy add oref tname    

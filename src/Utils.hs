@@ -100,7 +100,7 @@ findAuthorUtxo paper = do
     return filteredUtxos
   where
     f :: ChainIndexTxOut -> Bool
-    f o = assetClassValueOf (_ciTxOutValue o) (paperNFT paper) >= 1 
+    f o = assetClassValueOf (_ciTxOutValue o) (paperToken paper) >= 1 
 
 
 findLockedPaperOutputs :: Paper -> Ledger.Address -> Contract w s Text (Map TxOutRef ChainIndexTxOut)
@@ -116,7 +116,7 @@ findLockedPaperOutputs paper addr = do
     f :: ChainIndexTxOut -> Bool
     f o = let dat = getPaperDatum o
           in case dat of
-                Just d -> assetClassValueOf (_ciTxOutValue o) (paperNFT paper) == 1 && isClosed d
+                Just d -> assetClassValueOf (_ciTxOutValue o) (paperToken paper) == 1 && isClosed d
                 Nothing -> False
 
 
@@ -131,7 +131,7 @@ findPaperOutput paper add revPkh = do
     f :: (TxOutRef, ChainIndexTxOut) -> Bool
     f (_, o) = let dat = getPaperDatum o
                 in case dat of
-                Just d -> assetClassValueOf (_ciTxOutValue o) (paperNFT paper) == 2 && (d_reviewerPkh d) == revPkh
+                Just d -> assetClassValueOf (_ciTxOutValue o) (paperToken paper) == 2 && (d_reviewerPkh d) == revPkh
                 Nothing -> False
 
 

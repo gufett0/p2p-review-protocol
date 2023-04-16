@@ -12,10 +12,10 @@
  
 module TestsParallel where
 
-import           Tests (getUtxos, logWalletUtxos)
+import           Tests (logWalletUtxos)
 import           Types
 import           TxConstruction
-import           ReviewContract         
+import           ReviewContract   
 import           Control.Monad              hiding (fmap)
 import           Data.Default               (Default (..))
 import qualified Data.Map                   as Map
@@ -25,9 +25,8 @@ import           Ledger.Value
 import           Ledger.Ada                 as Ada
 import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
-import           Prelude                    (IO, Show (..), String, div, last)
+import           Prelude                    (IO, div)
 import           Wallet.Emulator.Wallet
-
 
 
 paperReviewTokenCurrency :: CurrencySymbol
@@ -50,8 +49,8 @@ w1 = knownWallet 1
 w2 = knownWallet 2
 w3 = knownWallet 3
 
-test' :: IO ()
-test' = runEmulatorTraceIO' def emCfg $ myTrace'
+test :: IO ()
+test = runEmulatorTraceIO' def emCfg $ myTrace'
   where
     emCfg :: EmulatorConfig
     emCfg = def { _initialChainState = Left $ Map.fromList
@@ -75,20 +74,21 @@ myTrace'  = do
     let mypaper = Paper { 
       author           = mockWalletPaymentPubKeyHash w1
     , stake            = 100_000_000
-    , reward           = stake mypaper `div` 2
-    , minNumPeers      = 3
+    , compensation     = stake mypaper `div` 2
+    , minNumPeers      = 2
     , timeInterval     = POSIXTime {getPOSIXTime = 10_000}
-    , paperNFT         = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
+    , paperToken       = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
     } 
 
     let pkh_reviewer1   = mockWalletPaymentPubKeyHash w2
         pkh_reviewer2   = mockWalletPaymentPubKeyHash w3
-        fileIpns  = Manuscript "ipns_address"
+        fileIpns  = Manuscript "/ipns/QmS4ust...4uVv"
+        finalNFT  = "PeerReviewedNFT./ipns/QmS4ust...4uVv"
         scriptAdd = paperAddress mypaper      
         ap0 = AuthorParams 
                         { upReviewer        = Just pkh_reviewer1
                         , upStake           = stake mypaper
-                        , upReward          = reward mypaper
+                        , upReward          = compensation mypaper
                         , upNumPeers        = minNumPeers mypaper
                         , upTimeToDeadline  = timeInterval mypaper
                         , upCurrency        = paperReviewTokenCurrency
@@ -99,7 +99,7 @@ myTrace'  = do
         rp = ReviewerParams
                         { rpAuthor         = author mypaper
                         , rpStake          = stake mypaper
-                        , rpReward         = reward mypaper
+                        , rpReward         = compensation mypaper
                         , rpNumPeers       = minNumPeers mypaper
                         , rpTimeToDeadline = timeInterval mypaper
                         , rpCurrency       = paperReviewTokenCurrency
@@ -109,12 +109,13 @@ myTrace'  = do
         cp = CloseParams
                         { ppAuthor         = author mypaper
                         , ppStake          = stake mypaper
-                        , ppReward         = reward mypaper
+                        , ppReward         = compensation mypaper
                         , ppNumPeers       = minNumPeers mypaper
                         , ppTimeToDeadline = timeInterval mypaper
                         , ppCurrency       = paperReviewTokenCurrency
                         , ppTokenName      = paperReviewToken
                         , ppFinalManuscript= fileIpns
+                        , ppFinalNFTName   = finalNFT
                         }    
 
 
@@ -139,11 +140,11 @@ myTrace'  = do
     callEndpoint @"authorAction" h0 ap2 -- Y
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"reviewerAction" h2 rp{rpDecision = Reject} -- Y
+    callEndpoint @"reviewerAction" h2 rp{rpDecision = Accept} -- Y
     void $ Emulator.waitNSlots 3
 {-
     callEndpoint @"closeAction" h0 cp 
-    void $ Emulator.waitNSlots 5
+    void $ Emulator.waitNSlots 3
 -}
     callEndpoint @"authorAction" h0 ap0 -- X 
     void $ Emulator.waitNSlots 3
@@ -154,8 +155,12 @@ myTrace'  = do
     callEndpoint @"authorAction" h0 ap2 -- Y
     void $ Emulator.waitNSlots 3
 
-    callEndpoint @"reviewerAction" h2 rp{rpDecision = Reject} -- Y
-    void $ Emulator.waitNSlots 3
+    callEndpoint @"reviewerAction" h2 rp{rpDecision = Accept} -- Y
+    void $ Emulator.waitNSlots 3 
 
-    logWalletUtxos "Script" (scriptAdd)
-    logWalletUtxos "Author" (mockWalletAddress w1)
+    callEndpoint @"closeAction" h0 cp 
+    void $ Emulator.waitNSlots 5   
+
+    logWalletUtxos "FINAL AUTHOR" (mockWalletAddress w1)
+    logWalletUtxos "FINAL SCRIPT" (scriptAdd)
+    

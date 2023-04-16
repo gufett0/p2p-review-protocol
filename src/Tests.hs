@@ -31,10 +31,6 @@ import           Plutus.Trace.Emulator      as Emulator
 import           PlutusTx.Prelude
 import           Prelude                    (IO, Show (..), String, div, last)
 import           Wallet.Emulator.Wallet
-{-
-import           Cardano.Wallet.Api
-import Ledger.Index 
-import           Plutus.Contract -}
 
 
 paperReviewTokenCurrency :: CurrencySymbol
@@ -60,10 +56,11 @@ w3 = knownWallet 3
 w4 = knownWallet 4
 
 
-testSet :: IO ()
-testSet = do
-    test [[Minor, Accept], [Major, Reject], [Major, Minor, Accept]]
-    --test [[Minor, Reject], [Minor, Reject], [Major, Minor, Accept]]
+testSet :: Bool -> IO ()
+testSet option = do
+    case option of
+        True -> test [[Minor, Accept], [Major, Reject], [Major, Minor, Accept]]
+        False -> test [[Minor, Accept], [Major, Minor, Reject], [Major, Reject]]
 
 
 test :: [[PaperDecision]] -> IO ()
@@ -95,10 +92,10 @@ myTrace pdlist = do
     let mypaper = Paper { 
       author           = mockWalletPaymentPubKeyHash w1
     , stake            = 100_000_000
-    , reward           = stake mypaper `div` 2
+    , compensation     = stake mypaper `div` 2
     , minNumPeers      = 3
     , timeInterval     = POSIXTime {getPOSIXTime = 10_000}
-    , paperNFT         = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
+    , paperToken       = (AssetClass (paperReviewTokenCurrency, paperReviewToken))
     } 
 
     let pkh_reviewer1   = mockWalletPaymentPubKeyHash w2
@@ -110,7 +107,7 @@ myTrace pdlist = do
         ap0 = AuthorParams 
                         { upReviewer        = Just pkh_reviewer1
                         , upStake           = stake mypaper
-                        , upReward          = reward mypaper
+                        , upReward          = compensation mypaper
                         , upNumPeers        = minNumPeers mypaper
                         , upTimeToDeadline  = timeInterval mypaper
                         , upCurrency        = paperReviewTokenCurrency
@@ -122,7 +119,7 @@ myTrace pdlist = do
         rp = ReviewerParams
                         { rpAuthor         = author mypaper
                         , rpStake          = stake mypaper
-                        , rpReward         = reward mypaper
+                        , rpReward         = compensation mypaper
                         , rpNumPeers       = minNumPeers mypaper
                         , rpTimeToDeadline = timeInterval mypaper
                         , rpCurrency       = paperReviewTokenCurrency
@@ -131,7 +128,7 @@ myTrace pdlist = do
         cp = CloseParams
                         { ppAuthor         = author mypaper
                         , ppStake          = stake mypaper
-                        , ppReward         = reward mypaper
+                        , ppReward         = compensation mypaper
                         , ppNumPeers       = minNumPeers mypaper
                         , ppTimeToDeadline = timeInterval mypaper
                         , ppCurrency       = paperReviewTokenCurrency
@@ -145,15 +142,13 @@ myTrace pdlist = do
     -- second review
     reviewingProcess h0 h2 (pdlist!!1) ap2 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", False)]
     -- third review
-    reviewingProcess h0 h3 (pdlist!!2) ap3 rp scriptAdd $ Map.fromList [("ReviewersLate", False), ("AuthorsLate", False)]
+    reviewingProcess h0 h3 (pdlist!!2) ap3 rp scriptAdd $ Map.fromList [("ReviewersLate", True), ("AuthorsLate", False)]
 
     callEndpoint @"closeAction" h0 cp 
     void $ Emulator.waitNSlots 5
     
     logWalletUtxos "FINAL AUTHOR" (mockWalletAddress w1)
     logWalletUtxos "FINAL SCRIPT" (scriptAdd)
-    
-
 
 -------------------
 reviewingProcess ::
@@ -202,7 +197,6 @@ logWalletUtxos role address = do
     Extras.logInfo $ "Current " ++ role ++ " UTXOS: " ++ show finalUtxos
 
 ---- Not used
-
 
 findMyDat :: Address -> Emulator.EmulatorTrace (Maybe PaperDatum)
 findMyDat addr = do

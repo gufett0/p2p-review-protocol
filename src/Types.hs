@@ -32,10 +32,10 @@ import qualified Data.Map               as Map
 data Paper = Paper
     { author           :: PaymentPubKeyHash
     , stake            :: Integer
-    , reward           :: Integer
+    , compensation     :: Integer
     , minNumPeers      :: Integer
     , timeInterval     :: POSIXTime 
-    , paperNFT         :: AssetClass
+    , paperToken       :: AssetClass
     } deriving (Haskell.Show, Generic, FromJSON, ToJSON, Haskell.Eq, Haskell.Ord)
 PlutusTx.makeLift ''Paper
 
@@ -97,7 +97,7 @@ data PaperDatum =
         d_nextDeadline       :: Maybe POSIXTime, 
         d_status             :: PaperStatus,
         d_allRevDecisions    :: Maybe [(PaymentPubKeyHash, PaperDecision)], 
-        d_peerReviewed       :: Bool 
+        d_peerReviewed       :: Bool
     }
     deriving (Haskell.Show, Generic, FromJSON, ToJSON, Haskell.Eq)
 instance Eq PaperDatum where
@@ -112,25 +112,6 @@ instance Eq PaperDatum where
 PlutusTx.makeIsDataIndexed ''PaperDatum [('PaperDatum,0)]
 
 
-{-data PaperDatum =
-    PaperDatum
-    {
-        d_currentManuscript  :: Manuscript, -- e.g. Manuscript "/ipns/QmS3..4uVv " (Round 0)
-        d_reviewerPkh        :: PaymentPubKeyHash,
-        d_currentDecision    :: Maybe PaperDecision, --e.g Just Minor
-        d_nextDeadline       :: POSIXTime, 
-        d_status             :: PaperStatus -- e.g. Submitted (Round 0)
-    }
-    deriving (Haskell.Show, Generic, FromJSON, ToJSON, Haskell.Eq)
-instance Eq PaperDatum where
-    {-# INLINABLE (==) #-}
-    a == b     =  (d_currentManuscript a == d_currentManuscript b) 
-               && (d_reviewerPkh a == d_reviewerPkh b) 
-               && (d_currentDecision a == d_currentDecision b) 
-               && (d_nextDeadline a == d_nextDeadline b) 
-               && (d_status a == d_status b) 
-PlutusTx.makeIsDataIndexed ''PaperDatum [('PaperDatum,0)]-}
-
 ------------------ Script Redeemer --------------------------------------------------------------------------------------
 
 data PaperRedeemer =   Revision PaperDecision 
@@ -141,27 +122,6 @@ data PaperRedeemer =   Revision PaperDecision
                     | PeerReviewed Manuscript
     deriving Haskell.Show
 PlutusTx.unstableMakeIsData ''PaperRedeemer
-
-{-
-
-instance Eq PaperRedeemer where
-    {-# INLINABLE (==) #-}
-    (Revision dec1) == (Revision dec2)         = dec1 == dec2
-    (UpdatedAt manuscript1) == (UpdatedAt manuscript2) = manuscript1 == manuscript2
-    (ClosedAt manuscript1) == (ClosedAt manuscript2)   = manuscript1 == manuscript2
-    ClaimAuthor == ClaimAuthor                   = True
-    ClaimReviewer == ClaimReviewer               = True
-    (PeerReviewed manuscript1) == (PeerReviewed manuscript2) = manuscript1 == manuscript2
-    _ == _                                       = False
-
-PlutusTx.makeIsDataIndexed ''PaperRedeemer [    ('Revision, 0),
-    ('UpdatedAt, 1),    ('ClosedAt, 2),
-    ('ClaimAuthor, 3),    ('ClaimReviewer, 4),
-    ('PeerReviewed, 5)  ]
--}
-
-
-
 
 
 

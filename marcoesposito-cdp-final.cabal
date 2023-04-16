@@ -11,7 +11,7 @@ License-files:      LICENSE
 library
   hs-source-dirs:      src
   exposed-modules:     ReviewContract
-                     , NFTMintingPolicy
+                     , ReviewPolicy
                      , Types
                      , Utils
                      , TxConstruction
