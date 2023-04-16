@@ -4,11 +4,17 @@ A "peer-to-peer review" is a proof of concept exercise that shows how a decentra
 
 
 #### Assumptions
-The goal of this project is to show a viable mechanism for a reviewing process (the green-framed box in the picture), assuming that other elements of a decentralized, permisionless and censorship-resistant academic ecosystem are in place. These can be broadly summarized in the following diagram, although their implementation goes beyond the scope of this project:
-
-![Screenshot 2023-03-06 at 19 50 41](https://user-images.githubusercontent.com/104091627/223203427-68435d17-262c-4a6d-8542-270d197d25a9.png)
-
-
+The goal of this project is to show a viable mechanism for a reviewing process (the grey circle in the diagram), assuming that other elements of a decentralized, permisionless and censorship-resistant academic ecosystem are in place. All of these can be broadly summarized in the following diagram, although their implementation goes beyond the scope of this project:
+```mermaid
+mindmap
+  root((On-chain <br/> Peer-to-Peer <br/>Review))
+    Offchain versioning and  <br/> storage of manuscripts  
+      (IPFS vs. <br/> centralized solutions)        
+    Academic publishing <br/> and monetization <br/> e.g. PubWeave     
+    Identfier of peers <br/> subject matter experts
+      (DIDs vs. <br/>Scopus ID, <br/> Web of science)
+    Paper copyrights <br/> e.g. openscienceNFTs
+```
 
 
 #### Objectives 
@@ -19,7 +25,7 @@ The goal of this project is to show a viable mechanism for a reviewing process (
 - <b>Accountability</b> is achieved by requiring reviewers to place a predefined stake that they may lose if they fail to meet their reviewing responsibilities and deadlines.
 
 ## Reviewing Process
-The following diagrams are a simplification of the on-chain steps behind the reviewing process. Go [here](https://github.com/gufett0/mesposito_CDP/tree/main/src) for a description of the source code and testing scenarios. 
+The following diagrams are a simplification of the on-chain steps behind the reviewing process. Go [here](https://github.com/gufett0/mesposito_CDP/tree/main/src) for a detailed description of the source code and testing scenarios. 
 
 
 #### Validator Txs flowchart 
