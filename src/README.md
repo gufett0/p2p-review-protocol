@@ -95,7 +95,7 @@ cd $<YOUR_CDP_PROJECT_PATH>
 
 cabal update
 
-cabal repl
+cabal repl 
 ```
 Now all the modules in the `src` directory will be loaded. 
 
