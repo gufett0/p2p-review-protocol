@@ -4,7 +4,7 @@ A "peer-to-peer review" is a proof of concept exercise that shows how a decentra
 
 
 #### Assumptions
-The goal of this project is to show a viable mechanism for a reviewing process (the green-framed box in the picture), assuming that other elements of a decentralized, permisionless and censorship-resistant academic ecosystem are in place:
+The goal of this project is to show a viable mechanism for a reviewing process (the green-framed box in the picture), assuming that other elements of a decentralized, permisionless and censorship-resistant academic ecosystem are in place. These can be broadly summarized in the following diagram, although their implementation goes beyond the scope of this project:
 
 ![Screenshot 2023-03-06 at 19 50 41](https://user-images.githubusercontent.com/104091627/223203427-68435d17-262c-4a6d-8542-270d197d25a9.png)
 
@@ -31,15 +31,15 @@ direction TB
 state UTXO1 {
 state Empty <<fork>>
 state Final <<choice>>
-[*] --> Submitted  : <i>Created UTXO\n (2 Tokens + Datum)</i>  
+[*] --> Submitted  : <i>Create script UTXO\n (2 Tokens + Datum)</i>  
 Submitted --> Reviewed : <b>UpdatedAt</b> 
 Reviewed --> Submitted : <b>Revision </b> 
 Submitted --> Final : <b>ClaimAuthor</b> 
 Reviewed --> Final : <b>ClaimReviewer</b> 
 Reviewed --> Closed : <b>ClosedAt</b> 
 Closed --> Final : <b>ClaimReviewer</b> 
-Final --> [*] : <i>Locked UTXO\n (1 Token + Datum)</i> 
-Final --> Empty : <i>Consumed UTXO\n (2 Tokens back to author)</i> 
+Final --> [*] : <i>Lock new UTXO\n (1 Token + Datum)</i> 
+Final --> Empty : <i>Consume script UTXO\n (2 Tokens back to author)</i> 
 state Endpoints {
 note left of Closed : Author has ended\n review process
 note left of Final : Funds are \n redistributed \n according to \n script logic
@@ -48,6 +48,21 @@ note left of Submitted : Author has (re)submitted paper
 }
 }
 ```
+So, after a single review gets closed, its locked utxo will have a datum similar to this:
+
+```
+PaperDatum{
+d_linkToManuscript    = Manuscript "/ipns/QmS4ust...4uVv",
+d_reviewerPkh         = "557d23c0a533b4d295ac2dc14b783a7efc293bc23ede88a6fefd203d",  
+d_currentDecision     = Just Minor,
+d_nextDeadline        = Nothing,
+d_status              = Closed (Round 2),
+d_allRevDecisions     = Nothing,
+d_peerReviewed        = False
+}
+
+```
+
 
 #### Concurrent Approach
 According to [IOG](https://iohk.io/en/blog/posts/2021/09/10/concurrency-and-all-that-cardano-smart-contracts-and-the-eutxo-model/), enabling concurrency is crucial for facilitating multiple actors to work simultaneously on a given task without causing interference with each other. Therefore, conducting the reviewing process in parallel within the same smart contract can be a more efficient approach.
@@ -96,24 +111,10 @@ stateDiagram-v2
     }
 ```
 
-So, each locked utxo will have a datum like this:
-
-```
-PaperDatum{
-d_linkToManuscript    = Manuscript "/ipns/QmS4ust...4uVv",
-d_reviewerPkh         = "557d23c0a533b4d295ac2dc14b783a7efc293bc23ede88a6fefd203d",  
-d_currentDecision     = Just Minor,
-d_nextDeadline        = Just (now + POSIXTime {getPOSIXTime = 10_000}),
-d_status              = Submitted (Round 2),
-d_allRevDecisions     = Nothing,
-d_peerReviewed        = False
-}
-
-```
 
 
 
-Once a minimum number of peers have reviewed the paper and most of final decisions are "Accept", each relevant UTXO may be consumed at the script address by the author to lock a new single UTXO with a final "peer-reviewed" datum:
+Once a minimum number of peers has reviewed the paper and most of final decisions are positive (e.g "Accept"), each relevant UTXO may be consumed at the script address by the author to create a new single UTXO with a final "peer-reviewed" datum:
 
 ```
 PaperDatum{
@@ -122,14 +123,11 @@ d_reviewerPkh         = Nothing,
 d_currentDecision     = Nothing,
 d_nextDeadline        = Nothing,
 d_status              = Closed (Round 0),
-d_allRevDecisions     = Just [(2e0a...a27c,Reject),(557d...203d,Accept),(80a4...3ca7,Accept)]
+d_allRevDecisions     = Just [(557d...203d,Accept),(2e0a...a27c,Reject),(80a4...3ca7,Accept)]
 d_peerReviewed        = True
 }
 
 ```
-
-
-
 
 
 ## Cardano Professional Developer 
