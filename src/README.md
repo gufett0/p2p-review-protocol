@@ -1,6 +1,7 @@
 # source code description
 
 The following is a brief walk-through of the main functions and data types of the code. 
+Skip to testing [here](#testing)
 
 ## On-chain
 
@@ -99,11 +100,49 @@ cabal repl
 Now all the modules in the `src` directory will be loaded. 
 
 
-For testing the behaviour of multiple reviewers in the emulator trace monad run:
+- For testing the expected behaviour of multiple reviewers in the emulator trace monad run (to change or to add each reviewer's decision, you can modify the `testSet` function):
 ```
 :l Tests
 
-testSet
+-- Most reviewers will accept the paper. Able to mint peer-reviewed nft 
+testSet True
 
+-- Most reviewers will reject the paper. Unable to mint peer-reviewed nft 
+testSet False
 ``` 
 
+the output for both scenarios is listed below
+
+
+|       Input    	|  Final Balances |
+|     :-------      |  :---: 	 	   |
+|` testSet True`    | {`Author`: 859 ₳ + 1 nft, `Script`: 2 ₳ + 6 tokens, `Rev1` : 1045 ₳,  `Rev2`: 1045 ₳, `Rev3`: 1045 ₳}|
+|`testSet False`    | {`Author`: 855 ₳ + 3 tokens, `Script`: 6 ₳ + 3 tokens, `Rev1` : 1045 ₳,  `Rev2`: 1045 ₳, `Rev3`: 1045 ₳}|
+
+
+
+- For testing the unexpected behaviour of either the author or the reviewers (i.e executing tx beyond deadlines) you can modify the last inputs of the function `reviewingProcess` between lines 140-145 of Tests.hs. For example, to simulate a third reviewer attempting to submit a late tx:
+```
+-- third review
+reviewingProcess h0 h3 (pdlist!!2) ap3 rp scriptAdd $ Map.fromList [("ReviewersLate", True), ("AuthorsLate", False)]
+``` 
+the output for this occurrence would be the loss of the third reviewer's stake, and because at least three complete reviewes are required the peer-reviewed nft is not minted:
+
+|       Input    	|  Final Balances |
+|     :-------      |  :---: 	 	   |
+|` testSet True`    | {`Author`: 1003 ₳ + 2 tokens, `Script`: 2 ₳ + 4 tokens, `Rev1` : 1045 ₳,  `Rev2`: 1045 ₳, `Rev3`: 899 ₳}|
+
+
+- Finally, for testing the concurrent behaviour of two reviewers run the following:
+
+```
+:l TestsParallel
+
+test
+```
+the output in this case would be a compensation for both reviewers and nft minting (Note that, for simplicity sake, the script parameter now allows for just two reviews):
+
+
+|       Input    	|  Final Balances |
+|     :-------      |  :---: 	 	   |
+|` test`    | {`Author`: 1003 ₳ + 1 nft, `Script`: 2 ₳ + 4 tokens, `Rev1` : 1045 ₳,  `Rev2`: 1045 ₳}|
