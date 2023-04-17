@@ -140,7 +140,7 @@ the output for this occurrence would be the loss of the third reviewer's stake, 
 
 test
 ```
-the output in this case would be a compensation for both reviewers and nft minting (Note that, for simplicity sake, the script parameter now allows for just two reviews):
+the output in this case would be the compensation for both reviewers and nft minting (Note that, for simplicity sake, the script parameter now allows for just two reviews):
 
 
 |       Input    	|  Final Balances |
