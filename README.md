@@ -137,4 +137,4 @@ d_peerReviewed        = True
 
 
 ## Cardano Professional Developer 
-Find Certificate at this link
+Find Certificate at this [link](https://www.credly.com/badges/45ada24e-cb7d-4fdd-a38c-fc5ab43c3b9f/public_url)
