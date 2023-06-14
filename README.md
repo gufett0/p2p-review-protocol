@@ -29,7 +29,7 @@ The following diagrams are a simplification of the on-chain steps behind the rev
 
 
 #### Validator Txs flowchart 
-The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and tranistion lines respectively. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that the other NFT will be locked in the script along with the datum containing the final review info (i.e. whether the paper got eventually rejected or accepted by the reviewer).
+The below state diagram shows the various steps of the reviewing process (endpoints grey area) where <i>Datums</i> and <i>Redeemers</i> are depicted in the state boxes and transition lines respectively. Once the reviewing process is over, either 2 or 1 NFT must be returned to the author. The latter case would mean that the other NFT will be locked in the script along with the datum containing the final review info (i.e. whether the paper got eventually rejected or accepted by the reviewer).
 
 ```mermaid
 stateDiagram-v2
